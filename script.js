@@ -242,7 +242,7 @@ function candidates(n){
 
         let m=12*(o+1)+PC[n];
 
-        if(m>=55 && m<=67){
+        if(m>=55 && m<=84){
             a.push({
                 s:n+o,
                 m:m
@@ -649,7 +649,8 @@ function renderScore(){
             "score",
             abc,
             {
-                staffwidth:1400,
+                responsive:"resize",
+                staffwidth:1120,
                 scale:1.15,
                 add_classes:true,
                 paddingtop:12,
@@ -657,7 +658,11 @@ function renderScore(){
                 paddingleft:12,
                 paddingright:12,
                 lineBreaks:[4,8,12,16,20,24],
-                oneSvgPerLine:false
+                wrap:{
+                    minSpacing:1.5,
+                    maxSpacing:2.5,
+                    preferredMeasuresPerLine:4
+                }
             }
         );
 
