@@ -321,7 +321,7 @@ function makeNotes(){
 
             notes.push(n);
 
-            prev=n[5].m;
+            prev=n[n.length-1].m;
         }
     });
 }
