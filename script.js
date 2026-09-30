@@ -595,47 +595,40 @@ function buildABC(){
 }
 
 function renderScore(){
-
     const container=document.querySelector("#score");
     if(!container) return;
 
     container.innerHTML="";
 
     try{
-
-        // Verify the generated data before engraving it.
+        // Verify generated data before engraving it.
         B.forEach((b,i)=>{
             if(i===5 || i===20) return;
-
             const expected=attackCount(ro[i][1]);
             const actual=notes[i] ? notes[i].length : 0;
-
             if(expected!==actual){
-                throw Error(
-                    `Measure ${i+1}: ${expected} attacks vs ${actual} pitches`
-                );
+                throw Error(`Measure ${i+1}: ${expected} attacks vs ${actual} pitches`);
             }
         });
 
         /*
-         * Do NOT ask abcjs to wrap the complete 24-bar tune. Different
-         * abcjs layout versions can choose a different number of measures
-         * when the staff is wide. Instead, engrave six explicit four-bar
-         * systems. This makes 1–4, 5–8, ... 21–24 deterministic.
-         *
-         * Playback still uses the complete ABC tune in makePlaybackVisual(),
-         * so this affects engraving only.
+         * Engrave SIX INDEPENDENT SYSTEMS. Each ABC string contains exactly
+         * four measures, so ABCJS has no opportunity to wrap 24 measures
+         * into an arbitrary number of bars per line.
          */
         const scoreWrap=document.createElement("div");
         scoreWrap.className="score-systems";
         container.appendChild(scoreWrap);
 
-        for(let group=0; group<6; group++){
+        const availableWidth=Math.max(900, Math.min(1500, container.clientWidth || 1400));
 
+        for(let group=0; group<6; group++){
             const first=group*4;
             const last=first+4;
+
             const system=document.createElement("div");
             system.className="score-system";
+            system.dataset.measures=`${first+1}-${last}`;
             scoreWrap.appendChild(system);
 
             const abc=[
@@ -652,33 +645,27 @@ function renderScore(){
             ];
 
             for(let i=first;i<last;i++){
-
                 const chord=B[i][0]
                     .replace(/♭/g,"b")
                     .replace(/♯/g,"#");
 
-                let bar;
-
-                // Measures 6 and 21 are intentionally open for improvisation.
-                if(i===5 || i===20){
-                    bar=`"${chord}" z8 |`;
-                }else{
-                    bar=`"${chord}" ${abcMeasure(i)} |`;
-                }
+                // Measures 6 and 21 remain completely open improvisation bars.
+                const bar=(i===5 || i===20)
+                    ? `"${chord}" z8 |`
+                    : `"${chord}" ${abcMeasure(i)} |`;
 
                 abc.push(bar);
             }
 
-            const abcText=abc.join("\n");
-
             ABCJS.renderAbc(
                 system,
-                abcText,
+                abc.join("\n"),
                 {
-                    staffwidth:1400,
+                    staffwidth:availableWidth-40,
                     scale:1.05,
                     add_classes:true,
-                    oneSvgPerLine:false,
+                    oneSvgPerLine:true,
+                    lineBreaks:[4],
                     paddingtop:group===0 ? 8 : 2,
                     paddingbottom:14,
                     paddingleft:20,
@@ -686,35 +673,21 @@ function renderScore(){
                 }
             );
 
-            // abcjs restarts its printed bar numbers at 1 for each
-            // independently engraved system. Convert them to 1–24.
+            // Renumber each independently rendered system to its true measure numbers.
             const numbers=system.querySelectorAll(".abcjs-bar-number");
             numbers.forEach((el,index)=>{
-                const number=first+index+1;
-                el.textContent=String(number);
+                el.textContent=String(first+index+1);
             });
         }
-
     }catch(err){
-
         container.innerHTML="";
         const msg=document.createElement("div");
         msg.className="score-error";
         msg.textContent="Notation data error: "+err.message;
         container.appendChild(msg);
-
         console.error(err);
     }
 }
-
-
-/* ============================================================
-   AUDIO TRANSPORT
-   ============================================================ */
-
-let audioSynth=null;
-let audioState="stopped";
-let audioLoading=false;
 
 function getTempo(){
     const el=document.querySelector("#tempo");
