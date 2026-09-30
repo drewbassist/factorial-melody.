@@ -1,1 +1,22 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css"></head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p><table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="script.js"></script></body></html>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css">
+<style>
+#score-section{
+    margin:28px 0 34px;
+    overflow-x:auto;
+    border:1px solid #e5e5e5;
+    background:#fff;
+    padding:18px 10px;
+}
+#score{
+    min-width:1100px;
+}
+#score svg{
+    display:block;
+    margin:0 auto;
+}
+</style>
+</head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
+<section id="score-section">
+  <div id="score"></div>
+</section><table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="https://unpkg.com/vexflow@4.2.3/build/vexflow.js"></script>
+<script src="script.js"></script></body></html>
