@@ -1,28 +1,28 @@
 const R=[
 ["Rhythm 1","Q · EE · EE · Q"],
 ["Rhythm 2","Q · EE · E · Q · E"],
-["Rhythm 3","Q · EE~E · E · E · E"],
+["Rhythm 3","Q · EE · E · E · E · E"],
 ["Rhythm 4","EE · Q · E · Q · E"],
-["Rhythm 5","EE · Q~E · E · E · E"],
+["Rhythm 5","EE · Q · E · E · E · E"],
 ["Rhythm 6","EE · Q · Q · EE"],
-["Rhythm 7","E · Q · E~E · E · E · E"],
+["Rhythm 7","E · Q · E · E · E · E · E"],
 ["Rhythm 8","E · Q · E · Q · EE"],
 ["Rhythm 9","E · Q · E · EE · Q"],
-["Rhythm 10","~EEEE · Q · EE~"],
-["Rhythm 11","~EEEE · EE · Q~"],
-["Rhythm 12","~EEEE · E · Q · E~"],
-["Rhythm 13","~E · Q · E · EEEE~"],
-["Rhythm 14","~Q · EE · EEEE~"],
-["Rhythm 15","~EE · Q · EEEE~"],
+["Rhythm 10","EEEE · Q · EE"],
+["Rhythm 11","EEEE · EE · Q"],
+["Rhythm 12","EEEE · E · Q · E"],
+["Rhythm 13","E · Q · E · EEEE"],
+["Rhythm 14","Q · EE · EEEE"],
+["Rhythm 15","EE · Q · EEEE"],
 ["Rhythm 16","Q · Q · EEEE"],
 ["Rhythm 17","EEEE · Q. · E"],
 ["Rhythm 18","Q. · E · EEEE"],
 ["Rhythm 19","EEEE · Q · Q"],
 ["Rhythm 20","E · Q. · EEEE"],
 ["Rhythm 21","EEEE · E · Q."],
-["Rhythm 22","EEEE~E · EE · Q"],
-["Rhythm 23","EEEE · E~Q · EE"],
-["Rhythm 24","EEEE · E~Q · E"]
+["Rhythm 22","EEEE · E · EE · Q"],
+["Rhythm 23","EEEE · E · Q · EE"],
+["Rhythm 24","EEEE · E · Q · E"]
 ];
 
 const B=[
@@ -296,13 +296,12 @@ function makeNotes(){
     B.forEach((b,i)=>{
 
         // Measures 6 and 21:
-        // rhythm is supplied but pitches are improvised.
+        // pitches are completely free for the player.
         if(i===5 || i===20){
 
             notes.push(null);
 
-            // Do not force generated melody continuity
-            // through the improvisation measure.
+            // Break melodic continuity at the improvisation measure.
             prev=null;
 
         } else {
