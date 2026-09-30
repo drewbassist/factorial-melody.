@@ -1,9 +1,12 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css"><style>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css">
+
+
+<style>
 #score-section{
-    margin:20px 0 38px;
+    margin:18px 0 36px;
     background:#fff;
     overflow-x:auto;
-    padding:4px 0 8px;
+    padding:10px 0 14px;
 }
 #score{
     width:100%;
@@ -11,25 +14,90 @@
 }
 #score svg{
     display:block;
-    width:100%;
-    height:auto;
+    margin:0 auto;
 }
-.abcjs-title{
-    font-family:Georgia,"Times New Roman",serif !important;
-    font-weight:700;
+#score .abcjs-note{
+    fill:#111;
+}
+#score .abcjs-staff{
+    stroke:#111;
+}
+#score .abcjs-bar{
+    stroke:#111;
+}
+#score .abcjs-chord{
+    font-family:Arial,Helvetica,sans-serif;
+    font-weight:600;
 }
 .score-error{
-    padding:30px;
-    border:1px solid #d9d9d9;
+    padding:42px 20px;
     text-align:center;
     color:#555;
+    font-family:Arial,Helvetica,sans-serif;
 }
-.improv-label{
-    display:none;
+</style>
+
+
+<style>
+#transport{
+    margin:16px 0 12px;
+    padding:10px 0 8px;
+    border-top:1px solid #ddd;
+    border-bottom:1px solid #ddd;
+}
+#transport-controls{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:40px;
+}
+#transport-controls button{
+    appearance:none;
+    border:1px solid #222;
+    background:#fff;
+    color:#111;
+    padding:9px 14px;
+    font:600 14px Arial,Helvetica,sans-serif;
+    cursor:pointer;
+}
+#transport-controls button:first-child{
+    background:#111;
+    color:#fff;
+}
+#transport-controls button:disabled{
+    opacity:.45;
+    cursor:default;
+}
+#transport-status{
+    margin-left:8px;
+    color:#666;
+    font:13px Arial,Helvetica,sans-serif;
+}
+#transport-progress{
+    height:3px;
+    margin-top:9px;
+    background:#e5e5e5;
+    overflow:hidden;
+}
+#transport-progress-fill{
+    width:0%;
+    height:100%;
+    background:#111;
+    transition:width .08s linear;
 }
 </style>
 
 </head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
+
+<section id="transport" aria-label="Playback controls">
+  <div id="transport-controls">
+    <button id="playPause" type="button">▶ Play</button>
+    <button id="stopPlayback" type="button">■ Stop</button>
+    <span id="transport-status" aria-live="polite">Ready</span>
+  </div>
+  <div id="transport-progress" aria-hidden="true"><div id="transport-progress-fill"></div></div>
+</section>
+
 <section id="score-section">
   <div id="score"></div>
 </section>
