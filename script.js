@@ -32,8 +32,8 @@ let ro=[],sel=[],notes=[];
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function shuffle(a){a=[...a];for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function candidates(n){let a=[];for(let o=3;o<=6;o++){let m=12*(o+1)+PC[n];if(m>=55&&m<=84)a.push({s:n+o,m})}return a}
-function melody(scale,previous=null){let scaleNotes=scale.split(",");let seq=shuffle([...scaleNotes,pick(scaleNotes)]);let out=[];for(const n of seq){let c=candidates(n).filter(x=>previous==null||Math.abs(x.m-previous)<=12);if(!c.length)throw Error("No legal octave placement");let p=pick(c);out.push(p);previous=p.m}return out}
-function makeNotes(){notes=[];let prev=null;B.forEach((b,i)=>{if(i===5||i===20){notes.push(null);prev=null}else{let n=melody(sel[i],prev);notes.push(n);prev=n[n.length-1].m}})}
+function melody(scale,previous=null,count=6){let scaleNotes=scale.split(",");let seq=[];while(seq.length<count){seq.push(...shuffle([...scaleNotes]));}seq=seq.slice(0,count);let out=[];for(const n of seq){let c=candidates(n).filter(x=>previous==null||Math.abs(x.m-previous)<=12);if(!c.length)throw Error("No legal octave placement");let p=pick(c);out.push(p);previous=p.m}return out}
+function makeNotes(){notes=[];let prev=null;B.forEach((b,i)=>{if(i===5||i===20){notes.push(null);prev=null}else{let count=attackCount(ro[i][1]);let n=melody(sel[i],prev,count);notes.push(n);prev=n[n.length-1].m}})}
 function rhythmTokens(text){return text.split("·").map(x=>x.trim()).filter(Boolean)}
 function attackCount(text){let n=0;for(const t of rhythmTokens(text)){if(t==="Q"||t==="Q.")n+=1;else if(t==="E")n+=1;else if(t==="EE")n+=2;else if(t==="EEEE")n+=4;else throw Error("Unknown rhythm token: "+t)}return n}
 function abcPitch(note){const m=note.match(/^([A-G](?:b|#)?)(\d)$/);if(!m)throw Error("Invalid pitch: "+note);let letter=m[1][0],acc=m[1].slice(1),oct=+m[2];let accidental=acc==="#"?"^":acc==="b"?"_":"";if(oct===4)return accidental+letter.toLowerCase();if(oct>4)return accidental+letter.toLowerCase()+"'".repeat(oct-4);if(oct<4)return accidental+letter.toUpperCase()+",".repeat(4-oct);return accidental+letter.toLowerCase()}
