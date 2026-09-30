@@ -402,4 +402,216 @@ document.querySelector("#pentas").onclick=()=>{
     render();
 };
 
+/* ============================================================
+   NOTATION RENDERER
+   ============================================================ */
+
+function rhythmTokens(text){
+    return text
+        .split("·")
+        .map(x=>x.trim())
+        .filter(Boolean);
+}
+
+function rhythmToDurations(text){
+    const tokens = rhythmTokens(text);
+    const out = [];
+
+    tokens.forEach(token=>{
+        if(token === "Q"){
+            out.push("q");
+        } else if(token === "Q."){
+            out.push("qd");
+        } else if(token === "E"){
+            out.push("8");
+        } else if(token === "EE"){
+            out.push("8","8");
+        } else if(token === "EEEE"){
+            out.push("8","8","8","8");
+        }
+    });
+
+    return out;
+}
+
+function noteToVexKey(note){
+    const match = note.s.match(/^([A-G])([#b]?)(\d)$/);
+
+    if(!match){
+        throw Error("Invalid generated pitch: " + note.s);
+    }
+
+    const letter = match[1].toLowerCase();
+    const accidental = match[2];
+    const octave = match[3];
+
+    return letter + (accidental || "") + "/" + octave;
+}
+
+function drawMeasure(ctx, x, y, width, height, index){
+    const VF = Vex.Flow;
+    const imp = index === 5 || index === 20;
+    const rhythm = ro[index] || R[index];
+    const measureNotes = notes[index];
+
+    const stave = new VF.Stave(x, y, width);
+
+    if(index === 0 || index === 12){
+        stave.addClef("treble").addTimeSignature("4/4");
+    }
+
+    if(index === 5 || index === 20){
+        stave.setText("IMPROVISE", VF.StaveModifier.Position.ABOVE, {
+            shift_x: width / 2 - 34,
+            shift_y: 0,
+            justification: 0
+        });
+    }
+
+    stave.setContext(ctx).draw();
+
+    if(imp){
+        const rest = new VF.StaveNote({
+            keys:["b/4"],
+            duration:"wr"
+        });
+
+        const voice = new VF.Voice({
+            num_beats:4,
+            beat_value:4
+        });
+
+        voice.addTickables([rest]);
+
+        new VF.Formatter()
+            .joinVoices([voice])
+            .format([voice], width - 18);
+
+        voice.draw(ctx, stave);
+
+        const text = new VF.TextNote({
+            text:"IMPROVISE",
+            font:{family:"Arial", size:14, weight:"bold"},
+            duration:"4"
+        }).setJustification(VF.TextNote.Justification.CENTER);
+
+        const textVoice = new VF.Voice({
+            num_beats:4,
+            beat_value:4
+        });
+
+        textVoice.addTickables([text]);
+
+        new VF.Formatter()
+            .joinVoices([textVoice])
+            .format([textVoice], width - 18);
+
+        textVoice.draw(ctx, stave);
+        return;
+    }
+
+    const durations = rhythmToDurations(rhythm[1]);
+
+    if(!measureNotes || measureNotes.length !== durations.filter(d=>d !== "qr").length){
+        console.warn("Notation/pitch count mismatch in measure", index + 1);
+    }
+
+    const vexNotes = [];
+    let pitchIndex = 0;
+
+    durations.forEach(duration=>{
+        const generated = measureNotes[pitchIndex++];
+
+        const staveNote = new VF.StaveNote({
+            clef:"treble",
+            keys:[noteToVexKey(generated)],
+            duration:duration
+        });
+
+        const accidental = generated.s.match(/^([A-G])([#b]?)/)[2];
+
+        if(accidental){
+            staveNote.addAccidental(
+                0,
+                new VF.Accidental(accidental)
+            );
+        }
+
+        vexNotes.push(staveNote);
+    });
+
+    const voice = new VF.Voice({
+        num_beats:4,
+        beat_value:4
+    });
+
+    voice.addTickables(vexNotes);
+
+    // Beam eighth-note groups automatically. There are no ties.
+    const beams = VF.Beam.generateBeams(vexNotes, {
+        beam_rests:false,
+        groups:[new VF.Fraction(2,8)]
+    });
+
+    new VF.Formatter()
+        .joinVoices([voice])
+        .format([voice], width - 18);
+
+    voice.draw(ctx, stave);
+    beams.forEach(beam=>beam.setContext(ctx).draw());
+}
+
+function renderScore(){
+    const container = document.querySelector("#score");
+
+    if(!container || typeof Vex === "undefined"){
+        return;
+    }
+
+    container.innerHTML = "";
+
+    const VF = Vex.Flow;
+    const width = Math.max(1100, container.clientWidth || 1100);
+    const systemWidth = Math.min(width - 30, 1120);
+    const measureWidth = (systemWidth - 30) / 6;
+    const systemHeight = 150;
+    const systems = 4;
+
+    const renderer = new VF.Renderer(
+        container,
+        VF.Renderer.Backends.SVG
+    );
+
+    renderer.resize(systemWidth + 30, systems * systemHeight + 40);
+
+    const ctx = renderer.getContext();
+    ctx.setFont("Arial", 10);
+
+    for(let system=0; system<systems; system++){
+        const y = 20 + system * systemHeight;
+
+        for(let col=0; col<6; col++){
+            const measureIndex = system * 6 + col;
+            const x = 10 + col * measureWidth;
+
+            drawMeasure(
+                ctx,
+                x,
+                y,
+                measureWidth,
+                100,
+                measureIndex
+            );
+        }
+    }
+}
+
+/* Re-render notation whenever the existing generator renders. */
+const originalRender = render;
+
+render = function(){
+    originalRender();
+    renderScore();
+};
+
 generateAll();
