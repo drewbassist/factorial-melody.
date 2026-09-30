@@ -1,22 +1,60 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css">
 <style>
+.score-header{
+    position:relative;
+    margin:28px auto 6px;
+    max-width:1120px;
+    min-height:74px;
+    text-align:center;
+}
+
+.score-title{
+    font-family:Georgia,"Times New Roman",serif;
+    font-size:34px;
+    line-height:1.05;
+    font-weight:700;
+    letter-spacing:-.02em;
+}
+
+.score-subtitle{
+    margin-top:6px;
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:13px;
+    color:#666;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+
 #score-section{
-    margin:28px 0 34px;
+    margin:24px 0 38px;
     overflow-x:auto;
-    border:1px solid #e5e5e5;
+    border:0;
     background:#fff;
-    padding:18px 10px;
+    padding:8px 0 4px;
 }
+
 #score{
-    min-width:1100px;
+    width:100%;
+    min-width:1120px;
 }
+
 #score svg{
     display:block;
     margin:0 auto;
 }
+
+@media(max-width:900px){
+    #score-section{
+        overflow-x:auto;
+    }
+}
 </style>
-</head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
-<section id="score-section">
-  <div id="score"></div>
-</section><table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="https://unpkg.com/vexflow@4.2.3/build/vexflow.js"></script>
+</head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><section class="score-header">
+      <div class="score-title">Factorial Melody</div>
+      <div class="score-subtitle">24-Bar Generated Exercise</div>
+    </section>
+    <p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
+    <section id="score-section">
+      <div id="score"></div>
+    </section><table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="https://unpkg.com/vexflow@4.2.3/build/vexflow.js"></script>
 <script src="script.js"></script></body></html>
