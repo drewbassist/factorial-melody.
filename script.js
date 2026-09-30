@@ -658,11 +658,7 @@ function renderScore(){
                 paddingleft:12,
                 paddingright:12,
                 lineBreaks:[4,8,12,16,20,24],
-                wrap:{
-                    minSpacing:1.5,
-                    maxSpacing:2.5,
-                    preferredMeasuresPerLine:4
-                }
+                oneSvgPerLine:false
             }
         );
 
