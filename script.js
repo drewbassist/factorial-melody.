@@ -448,7 +448,7 @@ function abcDurationToken(token){
 
     // L:1/8. Quarter = 2, eighth = 1.
     if(token==="Q") return "4";
-    if(token==="Q.") return "6";
+    if(token==="Q.") return "3";
     if(token==="E") return "2";
     if(token==="EE") return "2 2";
     if(token==="EEEE") return "1 1 1 1";
@@ -541,31 +541,48 @@ function abcMeasure(index){
 
     const out=[];
     let p=0;
+    let beamGroup="";
+
+    function flushBeamGroup(){
+        if(beamGroup){
+            out.push(beamGroup);
+            beamGroup="";
+        }
+    }
 
     tokens.forEach(token=>{
 
-        if(token==="EE"){
-            out.push(abcPitch(pitches[p++])+"1");
-            out.push(abcPitch(pitches[p++])+"1");
+        // Consecutive eighth-note attacks are deliberately written
+        // without spaces in ABC. That tells ABCJS to beam them.
+        if(token==="E"){
+            beamGroup += abcPitch(pitches[p++]) + "1";
+        }
+
+        else if(token==="EE"){
+            beamGroup += abcPitch(pitches[p++]) + "1";
+            beamGroup += abcPitch(pitches[p++]) + "1";
         }
 
         else if(token==="EEEE"){
             for(let j=0;j<4;j++){
-                out.push(abcPitch(pitches[p++])+"1");
+                beamGroup += abcPitch(pitches[p++]) + "1";
             }
         }
 
         else{
+            flushBeamGroup();
+
             out.push(
-                abcPitch(pitches[p++])+
+                abcPitch(pitches[p++]) +
                 abcRhythm(token)
             );
         }
     });
 
+    flushBeamGroup();
+
     return out.join(" ");
 }
-
 function buildABC(){
 
     let abc=[
