@@ -253,16 +253,57 @@ function candidates(n){
     return a;
 }
 
-function melody(scale,previous=null){
+function attackCount(rhythmText){
+
+    return rhythmText
+        .split("·")
+        .map(x=>x.trim())
+        .reduce((count,token)=>{
+
+            if(token==="Q" || token==="Q."){
+                return count+1;
+            }
+
+            if(token==="E"){
+                return count+1;
+            }
+
+            if(token==="EE"){
+                return count+2;
+            }
+
+            if(token==="EEEE"){
+                return count+4;
+            }
+
+            return count;
+        },0);
+}
+
+function melody(scale,previous=null,rhythmText="Q · E · E · E · E · E"){
 
     let scaleNotes=scale.split(",");
 
-    // All five pentatonic notes once
-    // plus one randomly selected repeated pitch class.
-    let seq=shuffle([
-        ...scaleNotes,
-        pick(scaleNotes)
-    ]);
+    const count=attackCount(rhythmText);
+
+    // Use every pentatonic pitch class before repeating, then shuffle.
+    // If a rhythm contains more than five attacks, additional pitch
+    // classes are selected at random.
+    let seq=[];
+
+    while(seq.length<count){
+
+        let cycle=shuffle(scaleNotes);
+
+        for(const n of cycle){
+
+            if(seq.length>=count){
+                break;
+            }
+
+            seq.push(n);
+        }
+    }
 
     let out=[];
 
@@ -306,7 +347,7 @@ function makeNotes(){
 
         } else {
 
-            let n=melody(sel[i],prev);
+            let n=melody(sel[i],prev,ro[i][1]);
 
             notes.push(n);
 
@@ -335,21 +376,11 @@ function render(){
 
         let row=[
             i+1,
-
-            // Always show the actual chord symbol(s).
             b[0],
-
             r[0],
-
             r[1],
-
-            imp
-                ? "Player chooses"
-                : sel[i],
-
-            imp
-                ? "Pitches free"
-                : notes[i].map(x=>x.s).join(" · ")
+            imp ? "Player chooses" : sel[i],
+            imp ? "Pitches free" : notes[i].map(x=>x.s).join(" · ")
         ];
 
         row.forEach(v=>{
@@ -363,6 +394,8 @@ function render(){
 
         t.appendChild(tr);
     });
+
+    renderScore();
 }
 
 function generateAll(){
@@ -402,216 +435,215 @@ document.querySelector("#pentas").onclick=()=>{
     render();
 };
 
+generateAll();
+
 /* ============================================================
-   NOTATION RENDERER
+   LEAD-SHEET STYLE SCORE
    ============================================================ */
 
 function rhythmTokens(text){
-    return text
-        .split("·")
-        .map(x=>x.trim())
-        .filter(Boolean);
+    return text.split("·").map(x=>x.trim()).filter(Boolean);
 }
 
-function rhythmToDurations(text){
-    const tokens = rhythmTokens(text);
-    const out = [];
+function rhythmToVex(text){
+    const out=[];
 
-    tokens.forEach(token=>{
-        if(token === "Q"){
-            out.push("q");
-        } else if(token === "Q."){
-            out.push("qd");
-        } else if(token === "E"){
-            out.push("8");
-        } else if(token === "EE"){
-            out.push("8","8");
-        } else if(token === "EEEE"){
-            out.push("8","8","8","8");
+    rhythmTokens(text).forEach(token=>{
+
+        if(token==="Q"){
+            out.push({duration:"q"});
+        }
+
+        else if(token==="Q."){
+            out.push({duration:"qd"});
+        }
+
+        else if(token==="E"){
+            out.push({duration:"8"});
+        }
+
+        else if(token==="EE"){
+            out.push({duration:"8"},{duration:"8"});
+        }
+
+        else if(token==="EEEE"){
+            out.push(
+                {duration:"8"},
+                {duration:"8"},
+                {duration:"8"},
+                {duration:"8"}
+            );
         }
     });
 
     return out;
 }
 
-function noteToVexKey(note){
-    const match = note.s.match(/^([A-G])([#b]?)(\d)$/);
+function noteKey(note){
+    const m=note.s.match(/^([A-G])([#b]?)(\d)$/);
 
-    if(!match){
-        throw Error("Invalid generated pitch: " + note.s);
+    if(!m){
+        throw Error("Invalid pitch: "+note.s);
     }
 
-    const letter = match[1].toLowerCase();
-    const accidental = match[2];
-    const octave = match[3];
-
-    return letter + (accidental || "") + "/" + octave;
+    return m[1].toLowerCase()+(m[2]||"")+"/"+m[3];
 }
 
-function drawMeasure(ctx, x, y, width, height, index){
-    const VF = Vex.Flow;
-    const imp = index === 5 || index === 20;
-    const rhythm = ro[index] || R[index];
-    const measureNotes = notes[index];
+function drawScoreMeasure(ctx,x,y,w,index){
 
-    const stave = new VF.Stave(x, y, width);
+    const VF=Vex.Flow;
+    const stave=new VF.Stave(x,y,w);
 
-    if(index === 0 || index === 12){
-        stave.addClef("treble").addTimeSignature("4/4");
+    if(index%4===0){
+        stave.addClef("treble");
+
+        if(index===0){
+            stave.addTimeSignature("4/4");
+        }
     }
 
-    if(index === 5 || index === 20){
-        stave.setText("IMPROVISE", VF.StaveModifier.Position.ABOVE, {
-            shift_x: width / 2 - 34,
-            shift_y: 0,
-            justification: 0
+    // Measure numbers: 1, 5, 9, 13, 17, 21.
+    if(index%4===0){
+        stave.setText(String(index+1),VF.StaveModifier.Position.LEFT,{
+            shift_x:-18,
+            shift_y:18
         });
     }
+
+    const improv=index===5 || index===20;
 
     stave.setContext(ctx).draw();
 
-    if(imp){
-        const rest = new VF.StaveNote({
-            keys:["b/4"],
-            duration:"wr"
+    if(improv){
+
+        const text=new VF.TextNote({
+            text:"IMPROVISE",
+            font:{
+                family:"Arial",
+                size:14,
+                weight:"bold"
+            },
+            duration:"4"
         });
 
-        const voice = new VF.Voice({
+        const voice=new VF.Voice({
             num_beats:4,
             beat_value:4
         });
 
-        voice.addTickables([rest]);
+        voice.addTickables([text]);
 
         new VF.Formatter()
             .joinVoices([voice])
-            .format([voice], width - 18);
+            .format([voice],w-20);
 
-        voice.draw(ctx, stave);
-
-        const text = new VF.TextNote({
-            text:"IMPROVISE",
-            font:{family:"Arial", size:14, weight:"bold"},
-            duration:"4"
-        }).setJustification(VF.TextNote.Justification.CENTER);
-
-        const textVoice = new VF.Voice({
-            num_beats:4,
-            beat_value:4
-        });
-
-        textVoice.addTickables([text]);
-
-        new VF.Formatter()
-            .joinVoices([textVoice])
-            .format([textVoice], width - 18);
-
-        textVoice.draw(ctx, stave);
+        voice.draw(ctx,stave);
         return;
     }
 
-    const durations = rhythmToDurations(rhythm[1]);
+    const rhythm=ro[index]||R[index];
+    const specs=rhythmToVex(rhythm[1]);
+    const generated=notes[index]||[];
 
-    if(!measureNotes || measureNotes.length !== durations.filter(d=>d !== "qr").length){
-        console.warn("Notation/pitch count mismatch in measure", index + 1);
-    }
+    const tickables=[];
 
-    const vexNotes = [];
-    let pitchIndex = 0;
+    specs.forEach((spec,i)=>{
 
-    durations.forEach(duration=>{
-        const generated = measureNotes[pitchIndex++];
+        const pitch=generated[i];
 
-        const staveNote = new VF.StaveNote({
-            clef:"treble",
-            keys:[noteToVexKey(generated)],
-            duration:duration
-        });
-
-        const accidental = generated.s.match(/^([A-G])([#b]?)/)[2];
-
-        if(accidental){
-            staveNote.addAccidental(
-                0,
-                new VF.Accidental(accidental)
-            );
+        if(!pitch){
+            return;
         }
 
-        vexNotes.push(staveNote);
+        const sn=new VF.StaveNote({
+            clef:"treble",
+            keys:[noteKey(pitch)],
+            duration:spec.duration
+        });
+
+        const accidental=pitch.s.match(/^([A-G])([#b]?)/)[2];
+
+        if(accidental){
+            sn.addAccidental(0,new VF.Accidental(accidental));
+        }
+
+        tickables.push(sn);
     });
 
-    const voice = new VF.Voice({
+    const voice=new VF.Voice({
         num_beats:4,
         beat_value:4
     });
 
-    voice.addTickables(vexNotes);
-
-    // Beam eighth-note groups automatically. There are no ties.
-    const beams = VF.Beam.generateBeams(vexNotes, {
-        beam_rests:false,
-        groups:[new VF.Fraction(2,8)]
-    });
+    voice.addTickables(tickables);
 
     new VF.Formatter()
         .joinVoices([voice])
-        .format([voice], width - 18);
+        .format([voice],w-20);
 
-    voice.draw(ctx, stave);
+    voice.draw(ctx,stave);
+
+    // Beam eighth-note figures.
+    const beams=VF.Beam.generateBeams(tickables,{
+        beam_rests:false
+    });
+
     beams.forEach(beam=>beam.setContext(ctx).draw());
 }
 
 function renderScore(){
-    const container = document.querySelector("#score");
 
-    if(!container || typeof Vex === "undefined"){
+    const container=document.querySelector("#score");
+
+    if(!container || typeof Vex==="undefined"){
         return;
     }
 
-    container.innerHTML = "";
+    container.innerHTML="";
 
-    const VF = Vex.Flow;
-    const width = Math.max(1100, container.clientWidth || 1100);
-    const systemWidth = Math.min(width - 30, 1120);
-    const measureWidth = (systemWidth - 30) / 6;
-    const systemHeight = 150;
-    const systems = 4;
+    const VF=Vex.Flow;
 
-    const renderer = new VF.Renderer(
+    // Four measures per system, six systems total.
+    const scoreWidth=Math.max(
+        1120,
+        Math.min(1500,container.clientWidth||1200)
+    );
+
+    const left=45;
+    const right=18;
+    const usable=scoreWidth-left-right;
+    const measureWidth=usable/4;
+
+    const systemHeight=128;
+    const top=20;
+    const height=top+(systemHeight*6)+12;
+
+    const renderer=new VF.Renderer(
         container,
         VF.Renderer.Backends.SVG
     );
 
-    renderer.resize(systemWidth + 30, systems * systemHeight + 40);
+    renderer.resize(scoreWidth,height);
 
-    const ctx = renderer.getContext();
-    ctx.setFont("Arial", 10);
+    const ctx=renderer.getContext();
 
-    for(let system=0; system<systems; system++){
-        const y = 20 + system * systemHeight;
+    ctx.setFont("Arial",10);
 
-        for(let col=0; col<6; col++){
-            const measureIndex = system * 6 + col;
-            const x = 10 + col * measureWidth;
+    for(let system=0;system<6;system++){
 
-            drawMeasure(
+        const y=top+(system*systemHeight);
+
+        for(let col=0;col<4;col++){
+
+            const index=(system*4)+col;
+
+            drawScoreMeasure(
                 ctx,
-                x,
+                left+(col*measureWidth),
                 y,
                 measureWidth,
-                100,
-                measureIndex
+                index
             );
         }
     }
 }
-
-/* Re-render notation whenever the existing generator renders. */
-const originalRender = render;
-
-render = function(){
-    originalRender();
-    renderScore();
-};
-
-generateAll();
