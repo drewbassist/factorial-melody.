@@ -483,7 +483,7 @@ function measureToABC(index){
         else if(token==="Q.") specs.push("6");
         else if(token==="E") specs.push("2");
         else if(token==="EE") specs.push("2","2");
-        else if(token==="EEEE") specs.push("2","2","2","2");
+        else if(token==="EEEE") specs.push("1","1","1","1");
     });
 
     const generated=notes[index];
@@ -551,8 +551,9 @@ K:C
 
 function abcPitch(p){
 
-    const m=p.match(/^([A-G])([#b]?)(\d)$/);
-    if(!m) throw Error("Invalid pitch: "+p);
+    const pitch = (typeof p==="string") ? p : p.s;
+    const m=pitch.match(/^([A-G])([#b]?)(\d)$/);
+    if(!m) throw Error("Invalid pitch: "+pitch);
 
     const letter=m[1];
     const accidental=m[2];
