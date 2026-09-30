@@ -39,7 +39,17 @@ function attackCount(text){let n=0;for(const t of rhythmTokens(text)){if(t==="Q"
 function abcPitch(note){const m=note.match(/^([A-G](?:b|#)?)(\d)$/);if(!m)throw Error("Invalid pitch: "+note);let letter=m[1][0],acc=m[1].slice(1),oct=+m[2];let accidental=acc==="#"?"^":acc==="b"?"_":"";if(oct===4)return accidental+letter.toLowerCase();if(oct>4)return accidental+letter.toLowerCase()+"'".repeat(oct-4);if(oct<4)return accidental+letter.toUpperCase()+",".repeat(4-oct);return accidental+letter.toLowerCase()}
 function abcDurToken(tok){if(tok==="Q")return "2";if(tok==="Q.")return "3";if(tok==="E")return "1";if(tok==="EE")return "1 1";if(tok==="EEEE")return "1 1 1 1";throw Error("Unknown rhythm: "+tok)}
 function abcMeasure(i){if(i===5||i===20)return 'z4';let rhythm=ro[i][1],tokens=rhythmTokens(rhythm),pitches=notes[i].map(x=>abcPitch(x.s));let expected=attackCount(rhythm),actual=pitches.length;if(expected!==actual)throw Error(`Measure ${i+1}: ${expected} attacks vs ${actual} pitches`);let out=[];let pi=0;for(const tok of tokens){let parts=abcDurToken(tok).split(" ");for(const d of parts){out.push(pitches[pi++]+d)}}return out.join(" ")}
-function buildABC(){let lines=["X:1","T:Factorial Melody","T:24-Bar Generated Exercise","M:4/4","L:1/8","K:C clef=treble","Q:1/4="+getTempo()];for(let start=0;start<24;start+=4){let line="";for(let i=start;i<start+4;i++){line+='["'+B[i][0].replaceAll('"','\\"')+'"] '+abcMeasure(i)+" | "}lines.push(line);if(start<20)lines.push("") }return lines.join("\n")}
+function buildABC(){
+  let lines=["X:1","T:Factorial Melody","T:24-Bar Generated Exercise","M:4/4","L:1/8","K:C clef=treble","Q:1/4="+getTempo()];
+  for(let start=0;start<24;start+=4){
+    let line="";
+    for(let i=start;i<start+4;i++){
+      line+='"'+B[i][0].replaceAll('"','\\"')+'" '+abcMeasure(i)+" | ";
+    }
+    lines.push(line);
+  }
+  return lines.join("\n");
+}
 function renderNotation(){const el=document.querySelector("#notation"),err=document.querySelector("#notationError");err.hidden=true;el.innerHTML="";try{if(!window.ABCJS)throw Error("Notation library could not be loaded.");let abc=buildABC();ABCJS.renderAbc(el,abc,{responsive:"resize",add_classes:true,staffwidth:1400,scale:1.05,format:{titlefont:"Times New Roman 28 bold",subtitlefont:"Arial 16",composerfont:"Arial 12",gchordfont:"Arial 15 bold"}})}catch(e){err.textContent="Notation data error: "+e.message;err.hidden=false;console.error(e)}}
 function renderTable(){let t=document.querySelector("#output");t.innerHTML="";B.forEach((b,i)=>{let imp=i===5||i===20,r=ro[i]||R[i];let tr=document.createElement("tr");if(imp)tr.className="improv";[i+1,b[0],r[0],r[1],imp?"Player chooses":sel[i],imp?"Pitches free":notes[i].map(x=>x.s).join(" · ")].forEach(v=>{let d=document.createElement("td");d.textContent=v;tr.appendChild(d)});t.appendChild(tr)})}
 function generateAll(){stopPlayback();ro=shuffle(R);sel=B.map(b=>b[1].length?pick(b[1]):null);makeNotes();renderTable();renderNotation()}
