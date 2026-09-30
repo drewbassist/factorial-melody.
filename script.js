@@ -260,8 +260,7 @@ function rhythmTokens(text){
 
 function attackCount(rhythmText){
     return rhythmTokens(rhythmText).reduce((count,token)=>{
-        if(token==="Q" || token==="Q.") return count+1;
-        if(token==="E") return count+1;
+        if(token==="Q" || token==="Q." || token==="E") return count+1;
         if(token==="EE") return count+2;
         if(token==="EEEE") return count+4;
         return count;
@@ -272,9 +271,8 @@ function melody(scale,previous=null,rhythmText="Q · E · E · E · E · E"){
 
     const scaleNotes=scale.split(",");
     const count=attackCount(rhythmText);
-
-    // Cycle through the five pitch classes, then repeat as necessary.
     const seq=[];
+
     while(seq.length<count){
         for(const n of shuffle(scaleNotes)){
             if(seq.length>=count) break;
@@ -287,13 +285,10 @@ function melody(scale,previous=null,rhythmText="Q · E · E · E · E · E"){
     for(const n of seq){
 
         const c=candidates(n).filter(x=>
-            previous==null ||
-            Math.abs(x.m-previous)<=12
+            previous==null || Math.abs(x.m-previous)<=12
         );
 
-        if(!c.length){
-            throw Error("No legal octave placement");
-        }
+        if(!c.length) throw Error("No legal octave placement");
 
         const p=pick(c);
         out.push(p);
@@ -404,461 +399,222 @@ document.querySelector("#pentas").onclick=()=>{
 generateAll();
 
 /* ============================================================
-   FACTORIAL MELODY — CHART / LEAD-SHEET ENGRAVER
+   FACTORIAL MELODY — ABCJS CHART RENDERER
    ============================================================ */
 
-const SVG_NS="http://www.w3.org/2000/svg";
+function abcPitch(note){
 
-const LETTER_STEP={
-    C:0,D:1,E:2,F:3,G:4,A:5,B:6
-};
+    const m=note.s.match(/^([A-G])([#b]?)(\d)$/);
+    if(!m) throw Error("Invalid pitch: "+note.s);
 
-function rhythmSpecs(text){
+    const letter=m[1];
+    const accidental=m[2];
+    const octave=Number(m[3]);
 
+    // ABC: uppercase = octave 4, lowercase = octave 5.
+    // Commas lower; apostrophes raise.
+    let abcLetter;
+    let marks="";
+
+    if(octave===4){
+        abcLetter=letter;
+    } else if(octave===5){
+        abcLetter=letter.toLowerCase();
+    } else if(octave===6){
+        abcLetter=letter.toLowerCase();
+        marks="'";
+    } else if(octave===3){
+        abcLetter=letter;
+        marks=",";
+    } else if(octave===2){
+        abcLetter=letter;
+        marks=",,";
+    } else {
+        throw Error("Unsupported octave for ABC: "+octave);
+    }
+
+    let acc="";
+    if(accidental==="#") acc="^";
+    if(accidental==="b") acc="_";
+
+    return acc+abcLetter+marks;
+}
+
+function abcDurationToken(token){
+
+    // L:1/16. Quarter = 4, eighth = 2, sixteenth = 1.
+    if(token==="Q") return "4";
+    if(token==="Q.") return "6";
+    if(token==="E") return "2";
+    if(token==="EE") return "2 2";
+    if(token==="EEEE") return "1 1 1 1";
+
+    throw Error("Unknown rhythm token: "+token);
+}
+
+function rhythmToABC(rhythmText){
+
+    const out=[];
+
+    rhythmTokens(rhythmText).forEach(token=>{
+        const value=abcDurationToken(token);
+        out.push(value);
+    });
+
+    return out.join(" ");
+}
+
+function measureToABC(index){
+
+    if(index===5 || index===20){
+        return "z8";
+    }
+
+    const rhythm=ro[index][1];
     const specs=[];
 
-    rhythmTokens(text).forEach(token=>{
+    rhythmTokens(rhythm).forEach(token=>{
 
-        if(token==="Q"){
-            specs.push({kind:"quarter",beats:1});
-        } else if(token==="Q."){
-            specs.push({kind:"dotted-quarter",beats:1.5});
-        } else if(token==="E"){
-            specs.push({kind:"eighth",beats:.5});
-        } else if(token==="EE"){
-            specs.push(
-                {kind:"eighth",beats:.5,group:true},
-                {kind:"eighth",beats:.5,group:true}
-            );
-        } else if(token==="EEEE"){
-            specs.push(
-                {kind:"sixteenth",beats:.25,group:true},
-                {kind:"sixteenth",beats:.25,group:true},
-                {kind:"sixteenth",beats:.25,group:true},
-                {kind:"sixteenth",beats:.25,group:true}
-            );
-        }
+        if(token==="Q") specs.push("4");
+        else if(token==="Q.") specs.push("6");
+        else if(token==="E") specs.push("2");
+        else if(token==="EE") specs.push("2","2");
+        else if(token==="EEEE") specs.push("2","2","2","2");
     });
 
-    return specs;
-}
-
-function pitchParts(s){
-
-    const m=s.match(/^([A-G])([#b]?)(\d)$/);
-
-    if(!m) throw Error("Bad pitch: "+s);
-
-    return {
-        letter:m[1],
-        accidental:m[2],
-        octave:Number(m[3]),
-        step:Number(m[3])*7+LETTER_STEP[m[1]]
-    };
-}
-
-function pitchY(s,staffTop){
-
-    const p=pitchParts(s);
-
-    // Treble staff: F5 is the top line, E4 the bottom line.
-    const topStep=5*7+LETTER_STEP.F;
-
-    return staffTop+(topStep-p.step)*5;
-}
-
-function svgNode(name,attrs,text){
-
-    const e=document.createElementNS(SVG_NS,name);
-
-    Object.entries(attrs||{}).forEach(([k,v])=>{
-        e.setAttribute(k,v);
-    });
-
-    if(text!==undefined){
-        e.textContent=text;
-    }
-
-    return e;
-}
-
-function addText(svg,x,y,text,size=14,weight="normal",anchor="middle",family="Arial"){
-
-    svg.appendChild(svgNode("text",{
-        x,y,
-        "font-family":family,
-        "font-size":size,
-        "font-weight":weight,
-        "text-anchor":anchor,
-        fill:"#111"
-    },text));
-}
-
-function drawLedgerLines(svg,x,y,staffTop){
-
-    const p=pitchParts(y);
-
-    // Ledger lines are every other diatonic step outside E4–F5.
-    const bottomStep=4*7+LETTER_STEP.E;
-    const topStep=5*7+LETTER_STEP.F;
-
-    if(p.step<bottomStep){
-        for(let step=bottomStep-2;step>=p.step;step-=2){
-            const ly=staffTop+(topStep-step)*5;
-            svg.appendChild(svgNode("line",{
-                x1:x-9,y1:ly,x2:x+9,y2:ly,
-                stroke:"#111","stroke-width":1
-            }));
-        }
-    }
-
-    if(p.step>topStep){
-        for(let step=topStep+2;step<=p.step;step+=2){
-            const ly=staffTop+(topStep-step)*5;
-            svg.appendChild(svgNode("line",{
-                x1:x-9,y1:ly,x2:x+9,y2:ly,
-                stroke:"#111","stroke-width":1
-            }));
-        }
-    }
-}
-
-function drawAccidental(svg,x,y,a){
-
-    if(!a) return;
-
-    const glyph=a==="#" ? "♯" : "♭";
-
-    addText(svg,x-12,y+5,glyph,18,"normal","middle","Times New Roman");
-}
-
-function drawNoteHead(svg,x,y){
-
-    svg.appendChild(svgNode("ellipse",{
-        cx:x,cy:y,
-        rx:5.4,ry:4.1,
-        fill:"#111",
-        transform:`rotate(-18 ${x} ${y})`
-    }));
-}
-
-function drawStem(svg,x,y,up){
-
-    const stemX=up ? x+5 : x-5;
-    const endY=up ? y-30 : y+30;
-
-    svg.appendChild(svgNode("line",{
-        x1:stemX,y1:y,x2:stemX,y2:endY,
-        stroke:"#111","stroke-width":1.7
-    }));
-
-    return {x:stemX,y:endY};
-}
-
-function drawFlag(svg,x,y,up,count=1){
-
-    const dir=up ? 1 : -1;
-
-    for(let i=0;i<count;i++){
-
-        const yy=y+(i*5*dir);
-
-        const path=up
-            ? `M ${x} ${yy} Q ${x+11} ${yy+4} ${x+7} ${yy+11}`
-            : `M ${x} ${yy} Q ${x-11} ${yy-4} ${x-7} ${yy-11}`;
-
-        svg.appendChild(svgNode("path",{
-            d:path,
-            fill:"none",
-            stroke:"#111",
-            "stroke-width":2
-        }));
-    }
-}
-
-function drawRest(svg,x,y,kind){
-
-    if(kind==="quarter"){
-        // Stylized quarter rest.
-        svg.appendChild(svgNode("path",{
-            d:`M ${x-2} ${y-19} Q ${x+7} ${y-11} ${x-1} ${y-4}
-               Q ${x-8} ${y+3} ${x+3} ${y+12}`,
-            fill:"none",
-            stroke:"#111",
-            "stroke-width":2.4
-        }));
-    }
-}
-
-function drawBeam(svg,items,level){
-
-    if(items.length<2) return;
-
-    const up=items[0].up;
-    const beamY=up
-        ? Math.min(...items.map(n=>n.stemY))
-        : Math.max(...items.map(n=>n.stemY));
-
-    const offset=level===2 ? (up?5:-5) : 0;
-
-    const x1=items[0].stemX;
-    const x2=items[items.length-1].stemX;
-
-    svg.appendChild(svgNode("polygon",{
-        points:up
-            ? `${x1},${beamY+offset} ${x2},${beamY+offset}
-                    ${x2},${beamY+offset+4} ${x1},${beamY+offset+4}`
-            : `${x1},${beamY+offset} ${x2},${beamY+offset}
-                    ${x2},${beamY+offset-4} ${x1},${beamY+offset-4}`,
-        fill:"#111"
-    }));
-}
-
-function drawRhythmGroup(svg,items){
-
-    let group=[];
-
-    function flush(){
-
-        if(group.length<2){
-            group=[];
-            return;
-        }
-
-        drawBeam(svg,group,1);
-
-        if(group.some(n=>n.kind==="sixteenth")){
-            drawBeam(svg,group,2);
-        }
-
-        group=[];
-    }
-
-    items.forEach(item=>{
-
-        if(item.kind==="eighth" || item.kind==="sixteenth"){
-            group.push(item);
-        } else {
-            flush();
-        }
-    });
-
-    flush();
-}
-
-function drawMeasure(svg,x,staffTop,w,index){
-
-    const chord=B[index][0];
-    const imp=(index===5 || index===20);
-
-    // Staff.
-    for(let line=0;line<5;line++){
-        const yy=staffTop+(line*10);
-
-        svg.appendChild(svgNode("line",{
-            x1:x,y1:yy,x2:x+w,y2:yy,
-            stroke:"#111","stroke-width":1
-        }));
-    }
-
-    // Clef and time signature at the beginning of each system.
-    const firstInSystem=(index%4===0);
-
-    if(firstInSystem){
-        addText(svg,x+17,staffTop+31,"𝄞",42,"normal","middle","Noto Music, Bravura, serif");
-
-        if(index===0){
-            addText(svg,x+43,staffTop+15,"4",17,"normal","middle");
-            addText(svg,x+43,staffTop+34,"4",17,"normal","middle");
-        }
-
-        addText(svg,x-11,staffTop+35,String(index+1),11,"normal","end");
-    }
-
-    // Chord symbol above the bar.
-    addText(svg,x+w/2,staffTop-18,chord,15,"bold","middle","Arial");
-
-    if(imp){
-
-        // Open improvisation bar: slash-like visual cue and label.
-        addText(svg,x+w/2,staffTop+5,"IMPROVISE",12,"bold");
-
-        for(let k=0;k<4;k++){
-            const sx=x+48+(k+0.5)*((w-65)/4);
-            svg.appendChild(svgNode("line",{
-                x1:sx-5,y1:staffTop+26,
-                x2:sx+5,y2:staffTop+16,
-                stroke:"#111","stroke-width":1.5
-            }));
-        }
-
-        return;
-    }
-
-    const specs=rhythmSpecs(ro[index][1]);
-    const generated=notes[index]||[];
+    const generated=notes[index];
 
     if(specs.length!==generated.length){
         throw Error(
-            `Measure ${index+1}: ${specs.length} notated attacks, `+
-            `${generated.length} generated pitches`
+            "Measure "+(index+1)+
+            ": "+specs.length+" attacks vs "+
+            generated.length+" pitches"
         );
     }
 
-    const start=x+(firstInSystem?63:11);
-    const end=x+w-8;
-    const available=end-start;
+    return generated.map((note,i)=>
+        abcPitch(note)+specs[i]
+    ).join(" ");
+}
 
-    let cursor=start;
-    const items=[];
+function chordABC(chord){
+    // ABC guitar-chord quotes accept slash chords and spaces.
+    return `"${chord}"`;
+}
 
-    specs.forEach((spec,i)=>{
+function buildABC(){
 
-        const span=available*(spec.beats/4);
-        const cx=cursor+(span/2);
-        const pitch=generated[i];
-        const py=pitchY(pitch,staffTop);
-        const pp=pitchParts(pitch);
+    let abc=
+`X:1
+T:Factorial Melody
+M:4/4
+L:1/16
+K:C
+%%staffwidth 1120
+%%stretchlast
+`;
 
-        const up=py>=staffTop+20;
+    for(let system=0;system<6;system++){
 
-        items.push({
-            x:cx,
-            y:py,
-            kind:spec.kind,
-            up,
-            pitch
-        });
+        const first=system*4;
+        const last=first+3;
 
-        cursor+=span;
-    });
+        let line="";
 
-    // Ledger lines and noteheads/stems.
-    items.forEach(item=>{
+        for(let i=first;i<=last;i++){
 
-        drawLedgerLines(svg,item.x,item.pitch,staffTop);
-        drawAccidental(svg,item.x,item.y,pitchParts(item.pitch).accidental);
+            line += chordABC(B[i][0])+" ";
 
-        drawNoteHead(svg,item.x,item.y);
+            if(i===5 || i===20){
 
-        const stem=drawStem(svg,item.x,item.y,item.up);
+                // Four-beat empty improvisation measure.
+                line += "z16";
 
-        item.stemX=stem.x;
-        item.stemY=stem.y;
+            } else {
 
-        if(item.kind==="eighth"){
-            // Individual eighth-note flag unless it will be beamed.
+                line += measureToABC(i);
+            }
+
+            line += "| ";
         }
 
-        if(item.kind==="sixteenth"){
-            // Individual flags are omitted when beamed.
-        }
-    });
+        abc += line.trim()+"\n";
+    }
 
-    // Beam contiguous eighth/sixteenth groups.
-    drawRhythmGroup(svg,items);
-
-    // Flags on isolated eighths/sixteenths.
-    items.forEach((item,i)=>{
-
-        const previous=items[i-1];
-        const next=items[i+1];
-
-        const beamedPrev=previous &&
-            (previous.kind==="eighth" || previous.kind==="sixteenth");
-
-        const beamedNext=next &&
-            (next.kind==="eighth" || next.kind==="sixteenth");
-
-        if(item.kind==="eighth" && !(beamedPrev||beamedNext)){
-            drawFlag(svg,item.stemX,item.stemY,item.up,1);
-        }
-
-        if(item.kind==="sixteenth" && !(beamedPrev||beamedNext)){
-            drawFlag(svg,item.stemX,item.stemY,item.up,2);
-        }
-    });
-
-    // Dotted quarter dot.
-    items.forEach(item=>{
-        if(item.kind==="dotted-quarter"){
-            svg.appendChild(svgNode("circle",{
-                cx:item.x+9,cy:item.y-1,r:2.1,fill:"#111"
-            }));
-        }
-    });
+    return abc;
 }
 
 function renderScore(){
 
-    const container=document.querySelector("#score");
-    if(!container) return;
+    const target=document.querySelector("#score");
 
-    container.innerHTML="";
+    if(!target) return;
 
-    const W=1240;
-    const H=790;
+    target.innerHTML="";
 
-    const svg=svgNode("svg",{
-        viewBox:`0 0 ${W} ${H}`,
-        width:"100%",
-        height:H,
-        "aria-label":"Factorial Melody 24-bar chart"
-    });
-
-    // Chart header.
-    addText(svg,W/2,43,"Factorial Melody",32,"bold","middle","Georgia");
-    addText(svg,W/2,65,"24-BAR GENERATED EXERCISE",11,"normal","middle","Arial");
-
-    // Header rule.
-    svg.appendChild(svgNode("line",{
-        x1:22,y1:79,x2:W-22,y2:79,
-        stroke:"#cfcfcf","stroke-width":1
-    }));
-
-    const left=52;
-    const right=28;
-    const gap=8;
-    const measureW=(W-left-right-gap*3)/4;
-    const staffTop0=111;
-    const systemHeight=112;
-
-    for(let system=0;system<6;system++){
-
-        const y=staffTop0+system*systemHeight;
-
-        for(let col=0;col<4;col++){
-
-            const index=system*4+col;
-            const x=left+col*(measureW+gap);
-
-            drawMeasure(svg,x,y,measureW,index);
-
-            // Barline between measures.
-            if(col<3){
-                svg.appendChild(svgNode("line",{
-                    x1:x+measureW,y1:y,
-                    x2:x+measureW,y2:y+40,
-                    stroke:"#111","stroke-width":1.4
-                }));
-            }
-
-            // Final barline.
-            if(col===3){
-                svg.appendChild(svgNode("line",{
-                    x1:x+measureW-5,y1:y,
-                    x2:x+measureW-5,y2:y+40,
-                    stroke:"#111","stroke-width":1
-                }));
-                svg.appendChild(svgNode("line",{
-                    x1:x+measureW-2,y1:y,
-                    x2:x+measureW-2,y2:y+40,
-                    stroke:"#111","stroke-width":2.5
-                }));
-            }
-        }
+    if(!window.ABCJS){
+        target.innerHTML=
+            '<div class="score-error">Music notation could not be loaded.</div>';
+        return;
     }
 
-    container.appendChild(svg);
-}
+    let abc;
 
+    try{
+        abc=buildABC();
+    }catch(error){
+
+        console.error(error);
+
+        target.innerHTML=
+            '<div class="score-error">'+
+            'Notation data error: '+error.message+
+            '</div>';
+
+        return;
+    }
+
+    ABCJS.renderAbc(
+        target,
+        abc,
+        {
+            responsive:"resize",
+            add_classes:true,
+            jazzchords:true,
+            initialClef:true,
+            oneSvgPerLine:true,
+            lineThickness:0.2,
+            paddingleft:10,
+            paddingright:10,
+            paddingtop:12,
+            paddingbottom:10,
+            wrap:{
+                preferredMeasuresPerLine:4,
+                minSpacing:1.6,
+                maxSpacing:2.2
+            },
+            format:{
+                titlefont:"Georgia 24",
+                subtitlefont:"Arial 11",
+                composerfont:"Arial 10",
+                gchordfont:"Arial 14 bold"
+            }
+        }
+    );
+
+    // Add a clear improvisation label above the two open bars.
+    // abcjs already renders the staff; this is a DOM overlay positioned
+    // relative to the corresponding system for the first visual pass.
+    const svgs=target.querySelectorAll("svg");
+
+    svgs.forEach((svg,systemIndex)=>{
+
+        if(systemIndex!==1 && systemIndex!==5) return;
+
+        const label=document.createElement("div");
+        label.className="improv-label";
+        label.textContent="IMPROVISE";
+
+        target.appendChild(label);
+    });
+}
