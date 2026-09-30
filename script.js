@@ -548,87 +548,390 @@ K:C
     return abc;
 }
 
-function renderScore(){
 
-    // Hard consistency check: one generated pitch per notated attack.
-    B.forEach((b,i)=>{
-        if(i===5 || i===20) return;
-        const expected=attackCount(ro[i][1]);
-        const actual=notes[i] ? notes[i].length : 0;
-        if(expected!==actual){
-            throw Error(`Measure ${i+1}: ${expected} attacks vs ${actual} pitches`);
+function abcPitch(p){
+
+    const m=p.match(/^([A-G])([#b]?)(\d)$/);
+    if(!m) throw Error("Invalid pitch: "+p);
+
+    const letter=m[1];
+    const accidental=m[2];
+    const octave=Number(m[3]);
+
+    // ABC octave convention:
+    // C4..B4 = uppercase; C5..B5 = lowercase.
+    let s="";
+
+    if(accidental==="#") s+="^";
+    if(accidental==="b") s+="_";
+
+    if(octave<=4){
+        s+=letter;
+        for(let o=octave;o<4;o++) s+=",";
+    } else {
+        s+=letter.toLowerCase();
+        for(let o=octave;o>5;o--) s+="'";
+    }
+
+    return s;
+}
+
+function abcRhythm(token){
+
+    // With L:1/8:
+    // E = 1/8, Q = 1/4, Q. = 3/8,
+    // EE = two eighth attacks, EEEE = four sixteenth attacks.
+    if(token==="E") return "1";
+    if(token==="Q") return "2";
+    if(token==="Q.") return "3";
+    if(token==="EE") return "1 1";
+    if(token==="EEEE") return "1/2 1/2 1/2 1/2";
+
+    throw Error("Unknown rhythm token: "+token);
+}
+
+function abcMeasure(index){
+
+    const rhythm=ro[index][1];
+    const tokens=rhythmTokens(rhythm);
+
+    if(index===5 || index===20){
+        return "z8 z8 z8 z8";
+    }
+
+    const pitches=notes[index] || [];
+    const attacks=attackCount(rhythm);
+
+    if(pitches.length!==attacks){
+        throw Error(
+            `Measure ${index+1}: ${attacks} attacks vs ${pitches.length} pitches`
+        );
+    }
+
+    const out=[];
+    let p=0;
+
+    tokens.forEach(token=>{
+
+        if(token==="EE"){
+            out.push(abcPitch(pitches[p++])+"1");
+            out.push(abcPitch(pitches[p++])+"1");
         }
-    });
 
-    const target=document.querySelector("#score");
-
-    if(!target) return;
-
-    target.innerHTML="";
-
-    if(!window.ABCJS){
-        target.innerHTML=
-            '<div class="score-error">Music notation could not be loaded.</div>';
-        return;
-    }
-
-    let abc;
-
-    try{
-        abc=buildABC();
-    }catch(error){
-
-        console.error(error);
-
-        target.innerHTML=
-            '<div class="score-error">'+
-            'Notation data error: '+error.message+
-            '</div>';
-
-        return;
-    }
-
-    ABCJS.renderAbc(
-        target,
-        abc,
-        {
-            responsive:"resize",
-            add_classes:true,
-            jazzchords:true,
-            initialClef:true,
-            oneSvgPerLine:true,
-            lineThickness:0.2,
-            paddingleft:10,
-            paddingright:10,
-            paddingtop:12,
-            paddingbottom:10,
-            wrap:{
-                preferredMeasuresPerLine:4,
-                minSpacing:1.6,
-                maxSpacing:2.2
-            },
-            format:{
-                titlefont:"Georgia 24",
-                subtitlefont:"Arial 11",
-                composerfont:"Arial 10",
-                gchordfont:"Arial 14 bold"
+        else if(token==="EEEE"){
+            for(let j=0;j<4;j++){
+                out.push(abcPitch(pitches[p++])+"1/2");
             }
         }
-    );
 
-    // Add a clear improvisation label above the two open bars.
-    // abcjs already renders the staff; this is a DOM overlay positioned
-    // relative to the corresponding system for the first visual pass.
-    const svgs=target.querySelectorAll("svg");
-
-    svgs.forEach((svg,systemIndex)=>{
-
-        if(systemIndex!==1 && systemIndex!==5) return;
-
-        const label=document.createElement("div");
-        label.className="improv-label";
-        label.textContent="IMPROVISE";
-
-        target.appendChild(label);
+        else{
+            out.push(
+                abcPitch(pitches[p++])+
+                abcRhythm(token)
+            );
+        }
     });
+
+    return out.join(" ");
 }
+
+function buildABC(){
+
+    let abc=[
+        "X:1",
+        "T:Factorial Melody",
+        "T:24-Bar Generated Exercise",
+        "M:4/4",
+        "L:1/8",
+        "K:C",
+        "%%barnumbers 1",
+        "%%measurefirst 1",
+        "%%staves (1)",
+        "%%stretchlast 1"
+    ];
+
+    for(let i=0;i<B.length;i++){
+
+        const chord=B[i][0]
+            .replace(/♭/g,"b")
+            .replace(/♯/g,"#");
+
+        let bar=abcMeasure(i);
+
+        // Chord symbol above each measure.
+        // Quotes are used so abcjs treats it as a chord annotation.
+        bar=`"${chord}" ${bar} |`;
+
+        // Keep the two improv measures visibly open.
+        if(i===5 || i===20){
+            bar=`"${chord}" z8 z8 z8 z8 |`;
+        }
+
+        abc.push(bar);
+    }
+
+    return abc.join("\n");
+}
+
+function renderScore(){
+
+    const container=document.querySelector("#score");
+    if(!container) return;
+
+    container.innerHTML="";
+
+    try{
+
+        // Verify data before asking abcjs to engrave it.
+        B.forEach((b,i)=>{
+            if(i===5 || i===20) return;
+
+            const expected=attackCount(ro[i][1]);
+            const actual=notes[i] ? notes[i].length : 0;
+
+            if(expected!==actual){
+                throw Error(
+                    `Measure ${i+1}: ${expected} attacks vs ${actual} pitches`
+                );
+            }
+        });
+
+        const abc=buildABC();
+
+        ABCJS.renderAbc(
+            "score",
+            abc,
+            {
+                responsive:"resize",
+                staffwidth:1120,
+                scale:1.15,
+                add_classes:true,
+                paddingtop:12,
+                paddingbottom:8,
+                paddingleft:12,
+                paddingright:12,
+                wrap:{
+                    minSpacing:1.5,
+                    maxSpacing:2.5,
+                    preferredMeasuresPerLine:4
+                }
+            }
+        );
+
+        // abcjs uses CSS classes for the engraving. Keep the chart
+        // restrained and close to the reference lead-sheet appearance.
+        const svg=container.querySelector("svg");
+
+        if(svg){
+            svg.setAttribute(
+                "aria-label",
+                "Factorial Melody 24-bar generated exercise"
+            );
+        }
+
+    }catch(err){
+
+        container.innerHTML="";
+        const msg=document.createElement("div");
+        msg.className="score-error";
+        msg.textContent="Notation data error: "+err.message;
+        container.appendChild(msg);
+
+        console.error(err);
+    }
+}
+
+
+/* ============================================================
+   TRANSPORT
+   ============================================================ */
+
+let synthController=null;
+let synthSequence=null;
+let playbackTimer=null;
+let playbackStartedAt=0;
+let playbackDuration=0;
+
+function stopTransport(){
+
+    if(playbackTimer){
+        clearInterval(playbackTimer);
+        playbackTimer=null;
+    }
+
+    if(synthController){
+        try{
+            synthController.pause();
+        }catch(e){}
+    }
+
+    const play=document.querySelector("#playPause");
+    const status=document.querySelector("#transport-status");
+    const fill=document.querySelector("#transport-progress-fill");
+
+    if(play) play.textContent="▶ Play";
+    if(status) status.textContent="Ready";
+    if(fill) fill.style.width="0%";
+}
+
+function setTransportProgress(value){
+
+    const fill=document.querySelector("#transport-progress-fill");
+    if(!fill) return;
+
+    const pct=Math.max(0,Math.min(100,value*100));
+    fill.style.width=pct+"%";
+}
+
+async function startTransport(){
+
+    if(typeof ABCJS==="undefined" || !ABCJS.synth){
+        const status=document.querySelector("#transport-status");
+        if(status) status.textContent="Audio engine unavailable";
+        return;
+    }
+
+    const abc=buildABC();
+
+    try{
+
+        if(!synthController){
+            synthController=new ABCJS.synth.SynthController();
+
+            await synthController.load("#transport",null,{
+                displayLoop:false,
+                displayRestart:false,
+                displayPlay:false,
+                displayProgress:false,
+                displayWarp:false
+            });
+        }
+
+        const visualObj=ABCJS.renderAbc(
+            "score",
+            abc,
+            {
+                responsive:"resize",
+                staffwidth:1120,
+                scale:1.15,
+                add_classes:true,
+                paddingtop:12,
+                paddingbottom:8,
+                paddingleft:12,
+                paddingright:12,
+                wrap:{
+                    minSpacing:1.5,
+                    maxSpacing:2.5,
+                    preferredMeasuresPerLine:4
+                }
+            }
+        )[0];
+
+        synthSequence=await synthController.setTune(
+            visualObj,
+            0,
+            {
+                chordsOff:false,
+                program:0
+            }
+        );
+
+        playbackStartedAt=performance.now();
+
+        const tempo=150;
+        const totalBeats=24*4;
+        playbackDuration=(totalBeats*60/tempo)*1000;
+
+        synthController.play();
+
+        const play=document.querySelector("#playPause");
+        const status=document.querySelector("#transport-status");
+
+        if(play) play.textContent="Ⅱ Pause";
+        if(status) status.textContent="Playing";
+
+        if(playbackTimer) clearInterval(playbackTimer);
+
+        playbackTimer=setInterval(()=>{
+
+            const elapsed=performance.now()-playbackStartedAt;
+            const progress=playbackDuration
+                ? elapsed/playbackDuration
+                : 0;
+
+            setTransportProgress(progress);
+
+            if(progress>=1){
+                clearInterval(playbackTimer);
+                playbackTimer=null;
+
+                if(play) play.textContent="▶ Play";
+                if(status) status.textContent="Ready";
+
+                setTransportProgress(0);
+            }
+
+        },80);
+
+    }catch(error){
+
+        console.error("Playback error:",error);
+
+        const status=document.querySelector("#transport-status");
+        if(status){
+            status.textContent="Click Play again to initialize audio";
+        }
+    }
+}
+
+async function toggleTransport(){
+
+    if(!synthController){
+        await startTransport();
+        return;
+    }
+
+    try{
+
+        const play=document.querySelector("#playPause");
+        const status=document.querySelector("#transport-status");
+
+        synthController.pause();
+
+        if(play) play.textContent="▶ Play";
+        if(status) status.textContent="Paused";
+
+    }catch(error){
+        console.error(error);
+        await startTransport();
+    }
+}
+
+// Controls
+document.querySelector("#generate").onclick=()=>{
+    stopTransport();
+    generateAll();
+};
+
+document.querySelector("#rhythms").onclick=()=>{
+    stopTransport();
+    ro=shuffle(R);
+    makeNotes();
+    render();
+};
+
+document.querySelector("#pentas").onclick=()=>{
+    stopTransport();
+    sel=B.map(b=>
+        b[1].length
+            ? pick(b[1])
+            : null
+    );
+    makeNotes();
+    render();
+};
+
+document.querySelector("#playPause").onclick=toggleTransport;
+document.querySelector("#stopPlayback").onclick=stopTransport;
+
+generateAll();
