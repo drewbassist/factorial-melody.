@@ -566,6 +566,7 @@ function buildABC(){
         "K:C",
         "%%barnumbers 1",
         "%%measurefirst 1",
+        "%%barsperstaff 4",
         "%%staves (1)",
         "%%stretchlast 1"
     ];
