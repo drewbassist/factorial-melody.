@@ -380,6 +380,10 @@ document.querySelector("#rhythms").onclick=()=>{
 
     ro=shuffle(R);
 
+    // Rhythm randomization can change the number of attacks.
+    // Regenerate pitches so every attack has a corresponding pitch.
+    makeNotes();
+
     render();
 };
 
@@ -545,6 +549,16 @@ K:C
 }
 
 function renderScore(){
+
+    // Hard consistency check: one generated pitch per notated attack.
+    B.forEach((b,i)=>{
+        if(i===5 || i===20) return;
+        const expected=attackCount(ro[i][1]);
+        const actual=notes[i] ? notes[i].length : 0;
+        if(expected!==actual){
+            throw Error(`Measure ${i+1}: ${expected} attacks vs ${actual} pitches`);
+        }
+    });
 
     const target=document.querySelector("#score");
 
