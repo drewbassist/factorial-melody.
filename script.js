@@ -523,66 +523,65 @@ function abcRhythm(token){
 
 function abcMeasure(index){
 
-    const rhythm=ro[index][1];
-    const tokens=rhythmTokens(rhythm);
+    const rhythm = ro[index][1];
+    const tokens = rhythmTokens(rhythm);
 
-    if(index===5 || index===20){
-        return "z8";
-    }
+    // Full 4/4 improvisation bar.
+    if(index === 5 || index === 20) return "z8";
 
-    const pitches=notes[index] || [];
-    const attacks=attackCount(rhythm);
+    const pitches = notes[index] || [];
+    const attacks = attackCount(rhythm);
 
-    if(pitches.length!==attacks){
+    if(pitches.length !== attacks){
         throw Error(
-            `Measure ${index+1}: ${attacks} attacks vs ${pitches.length} pitches`
+            `Measure ${index + 1}: ${attacks} attacks vs ${pitches.length} pitches`
         );
     }
 
-    const out=[];
-    let p=0;
-    let beamGroup="";
+    let p = 0;
+    const out = [];
+    let beam = "";
 
-    function flushBeamGroup(){
-        if(beamGroup){
-            out.push(beamGroup);
-            beamGroup="";
+    function flushBeam(){
+        if(beam){
+            out.push(beam);
+            beam = "";
         }
     }
 
-    tokens.forEach(token=>{
+    for(const token of tokens){
 
-        // Consecutive eighth-note attacks are deliberately written
-        // without spaces in ABC. That tells ABCJS to beam them.
-        if(token==="E"){
-            beamGroup += abcPitch(pitches[p++]) + "1";
+        // L:1/8 means an undelimited pitch is an eighth note.
+        // Adjacent eighth notes are therefore automatically beamed by abcjs.
+        if(token === "E"){
+            beam += abcPitch(pitches[p++]);
         }
 
-        else if(token==="EE"){
-            beamGroup += abcPitch(pitches[p++]) + "1";
-            beamGroup += abcPitch(pitches[p++]) + "1";
+        else if(token === "EE"){
+            beam += abcPitch(pitches[p++]);
+            beam += abcPitch(pitches[p++]);
         }
 
-        else if(token==="EEEE"){
+        else if(token === "EEEE"){
             for(let j=0;j<4;j++){
-                beamGroup += abcPitch(pitches[p++]) + "1";
+                beam += abcPitch(pitches[p++]);
             }
         }
 
         else{
-            flushBeamGroup();
-
+            flushBeam();
             out.push(
                 abcPitch(pitches[p++]) +
                 abcRhythm(token)
             );
         }
-    });
+    }
 
-    flushBeamGroup();
+    flushBeam();
 
     return out.join(" ");
 }
+
 function buildABC(){
 
     let abc=[
