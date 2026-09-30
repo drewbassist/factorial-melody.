@@ -742,196 +742,27 @@ function renderScore(){
 }
 
 
-/* ============================================================
-   TRANSPORT
-   ============================================================ */
-
-let synthController=null;
-let synthSequence=null;
-let playbackTimer=null;
-let playbackStartedAt=0;
-let playbackDuration=0;
-
-function stopTransport(){
-
-    if(playbackTimer){
-        clearInterval(playbackTimer);
-        playbackTimer=null;
-    }
-
-    if(synthController){
-        try{
-            synthController.pause();
-        }catch(e){}
-    }
-
-    const play=document.querySelector("#playPause");
-    const status=document.querySelector("#transport-status");
-    const fill=document.querySelector("#transport-progress-fill");
-
-    if(play) play.textContent="▶ Play";
-    if(status) status.textContent="Ready";
-    if(fill) fill.style.width="0%";
-}
-
-function setTransportProgress(value){
-
-    const fill=document.querySelector("#transport-progress-fill");
-    if(!fill) return;
-
-    const pct=Math.max(0,Math.min(100,value*100));
-    fill.style.width=pct+"%";
-}
-
-async function startTransport(){
-
-    if(typeof ABCJS==="undefined" || !ABCJS.synth){
-        const status=document.querySelector("#transport-status");
-        if(status) status.textContent="Audio engine unavailable";
-        return;
-    }
-
-    const abc=buildABC();
-
-    try{
-
-        if(!synthController){
-            synthController=new ABCJS.synth.SynthController();
-
-            await synthController.load("#transport",null,{
-                displayLoop:false,
-                displayRestart:false,
-                displayPlay:false,
-                displayProgress:false,
-                displayWarp:false
-            });
-        }
-
-        const visualObj=ABCJS.renderAbc(
-            "score",
-            abc,
-            {
-                responsive:"resize",
-                staffwidth:1120,
-                scale:1.15,
-                add_classes:true,
-                paddingtop:12,
-                paddingbottom:8,
-                paddingleft:12,
-                paddingright:12,
-                wrap:{
-                    minSpacing:1.5,
-                    maxSpacing:2.5,
-                    preferredMeasuresPerLine:4
-                }
-            }
-        )[0];
-
-        synthSequence=await synthController.setTune(
-            visualObj,
-            0,
-            {
-                chordsOff:false,
-                program:0
-            }
-        );
-
-        playbackStartedAt=performance.now();
-
-        const tempo=150;
-        const totalBeats=24*4;
-        playbackDuration=(totalBeats*60/tempo)*1000;
-
-        synthController.play();
-
-        const play=document.querySelector("#playPause");
-        const status=document.querySelector("#transport-status");
-
-        if(play) play.textContent="Ⅱ Pause";
-        if(status) status.textContent="Playing";
-
-        if(playbackTimer) clearInterval(playbackTimer);
-
-        playbackTimer=setInterval(()=>{
-
-            const elapsed=performance.now()-playbackStartedAt;
-            const progress=playbackDuration
-                ? elapsed/playbackDuration
-                : 0;
-
-            setTransportProgress(progress);
-
-            if(progress>=1){
-                clearInterval(playbackTimer);
-                playbackTimer=null;
-
-                if(play) play.textContent="▶ Play";
-                if(status) status.textContent="Ready";
-
-                setTransportProgress(0);
-            }
-
-        },80);
-
-    }catch(error){
-
-        console.error("Playback error:",error);
-
-        const status=document.querySelector("#transport-status");
-        if(status){
-            status.textContent="Click Play again to initialize audio";
-        }
-    }
-}
-
-async function toggleTransport(){
-
-    if(!synthController){
-        await startTransport();
-        return;
-    }
-
-    try{
-
-        const play=document.querySelector("#playPause");
-        const status=document.querySelector("#transport-status");
-
-        synthController.pause();
-
-        if(play) play.textContent="▶ Play";
-        if(status) status.textContent="Paused";
-
-    }catch(error){
-        console.error(error);
-        await startTransport();
-    }
-}
-
 // Controls
 document.querySelector("#generate").onclick=()=>{
-    stopTransport();
+    stopAudio();
     generateAll();
+    refreshAudio();
 };
 
 document.querySelector("#rhythms").onclick=()=>{
-    stopTransport();
+    stopAudio();
     ro=shuffle(R);
     makeNotes();
     render();
+    refreshAudio();
 };
 
 document.querySelector("#pentas").onclick=()=>{
-    stopTransport();
-    sel=B.map(b=>
-        b[1].length
-            ? pick(b[1])
-            : null
-    );
+    stopAudio();
+    sel=B.map(b=>b[1].length ? pick(b[1]) : null);
     makeNotes();
     render();
+    refreshAudio();
 };
-
-document.querySelector("#playPause").onclick=toggleTransport;
-document.querySelector("#stopPlayback").onclick=stopTransport;
 
 generateAll();
