@@ -603,7 +603,7 @@ function renderScore(){
 
     try{
 
-        // Verify data before asking abcjs to engrave it.
+        // Verify the generated data before engraving it.
         B.forEach((b,i)=>{
             if(i===5 || i===20) return;
 
@@ -617,33 +617,82 @@ function renderScore(){
             }
         });
 
-        const abc=buildABC();
+        /*
+         * Do NOT ask abcjs to wrap the complete 24-bar tune. Different
+         * abcjs layout versions can choose a different number of measures
+         * when the staff is wide. Instead, engrave six explicit four-bar
+         * systems. This makes 1–4, 5–8, ... 21–24 deterministic.
+         *
+         * Playback still uses the complete ABC tune in makePlaybackVisual(),
+         * so this affects engraving only.
+         */
+        const scoreWrap=document.createElement("div");
+        scoreWrap.className="score-systems";
+        container.appendChild(scoreWrap);
 
-        ABCJS.renderAbc(
-            "score",
-            abc,
-            {
-                staffwidth:1400,
-                scale:1.05,
-                add_classes:true,
-                oneSvgPerLine:true,
-                paddingtop:12,
-                paddingbottom:18,
-                paddingleft:20,
-                paddingright:20,
-                lineBreaks:[4,8,12,16,20,24]
+        for(let group=0; group<6; group++){
+
+            const first=group*4;
+            const last=first+4;
+            const system=document.createElement("div");
+            system.className="score-system";
+            scoreWrap.appendChild(system);
+
+            const abc=[
+                "X:1",
+                group===0 ? "T:Factorial Melody" : "T:",
+                group===0 ? "T:24-Bar Generated Exercise" : "T:",
+                "M:4/4",
+                "L:1/8",
+                `Q:1/4=${getTempo()}`,
+                "K:C",
+                "%%barnumbers 1",
+                "%%measurefirst 1",
+                "%%stretchlast 1"
+            ];
+
+            for(let i=first;i<last;i++){
+
+                const chord=B[i][0]
+                    .replace(/♭/g,"b")
+                    .replace(/♯/g,"#");
+
+                let bar;
+
+                // Measures 6 and 21 are intentionally open for improvisation.
+                if(i===5 || i===20){
+                    bar=`"${chord}" z8 |`;
+                }else{
+                    bar=`"${chord}" ${abcMeasure(i)} |`;
+                }
+
+                abc.push(bar);
             }
-        );
 
-        // abcjs uses CSS classes for the engraving. Keep the chart
-        // restrained and close to the reference lead-sheet appearance.
-        const svg=container.querySelector("svg");
+            const abcText=abc.join("\n");
 
-        if(svg){
-            svg.setAttribute(
-                "aria-label",
-                "Factorial Melody 24-bar generated exercise"
+            ABCJS.renderAbc(
+                system,
+                abcText,
+                {
+                    staffwidth:1400,
+                    scale:1.05,
+                    add_classes:true,
+                    oneSvgPerLine:false,
+                    paddingtop:group===0 ? 8 : 2,
+                    paddingbottom:14,
+                    paddingleft:20,
+                    paddingright:20
+                }
             );
+
+            // abcjs restarts its printed bar numbers at 1 for each
+            // independently engraved system. Convert them to 1–24.
+            const numbers=system.querySelectorAll(".abcjs-bar-number");
+            numbers.forEach((el,index)=>{
+                const number=first+index+1;
+                el.textContent=String(number);
+            });
         }
 
     }catch(err){
