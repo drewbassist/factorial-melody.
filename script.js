@@ -446,7 +446,7 @@ function abcPitch(note){
 
 function abcDurationToken(token){
 
-    // L:1/16. Quarter = 4, eighth = 2, sixteenth = 1.
+    // L:1/8. Quarter = 2, eighth = 1.
     if(token==="Q") return "4";
     if(token==="Q.") return "6";
     if(token==="E") return "2";
@@ -510,12 +510,13 @@ function abcRhythm(token){
 
     // With L:1/8:
     // E = 1/8, Q = 1/4, Q. = 3/8,
-    // EE = two eighth attacks, EEEE = four sixteenth attacks.
+    // EE = two eighth-note attacks,
+    // EEEE = four eighth-note attacks.
     if(token==="E") return "1";
     if(token==="Q") return "2";
     if(token==="Q.") return "3";
     if(token==="EE") return "1 1";
-    if(token==="EEEE") return "1/2 1/2 1/2 1/2";
+    if(token==="EEEE") return "1 1 1 1";
 
     throw Error("Unknown rhythm token: "+token);
 }
@@ -550,7 +551,7 @@ function abcMeasure(index){
 
         else if(token==="EEEE"){
             for(let j=0;j<4;j++){
-                out.push(abcPitch(pitches[p++])+"1/2");
+                out.push(abcPitch(pitches[p++])+"1");
             }
         }
 
