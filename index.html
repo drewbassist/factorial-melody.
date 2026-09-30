@@ -37,65 +37,39 @@
 }
 </style>
 
-
 <style>
 #transport{
     margin:16px 0 12px;
-    padding:10px 0 8px;
+    padding:10px 0 12px;
     border-top:1px solid #ddd;
     border-bottom:1px solid #ddd;
 }
-#transport-controls{
+#audio-control{min-height:42px;}
+#tempo-control{
     display:flex;
     align-items:center;
-    gap:8px;
-    min-height:40px;
+    gap:7px;
+    margin-top:8px;
+    font:13px Arial,Helvetica,sans-serif;
+    color:#555;
 }
-#transport-controls button{
-    appearance:none;
-    border:1px solid #222;
-    background:#fff;
-    color:#111;
-    padding:9px 14px;
-    font:600 14px Arial,Helvetica,sans-serif;
-    cursor:pointer;
-}
-#transport-controls button:first-child{
-    background:#111;
-    color:#fff;
-}
-#transport-controls button:disabled{
-    opacity:.45;
-    cursor:default;
-}
-#transport-status{
-    margin-left:8px;
-    color:#666;
+#tempo-control label{font-weight:600;color:#111;}
+#tempo{
+    width:72px;
+    padding:6px 7px;
+    border:1px solid #bbb;
     font:13px Arial,Helvetica,sans-serif;
 }
-#transport-progress{
-    height:3px;
-    margin-top:9px;
-    background:#e5e5e5;
-    overflow:hidden;
-}
-#transport-progress-fill{
-    width:0%;
-    height:100%;
-    background:#111;
-    transition:width .08s linear;
-}
 </style>
-
 </head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
 
 <section id="transport" aria-label="Playback controls">
-  <div id="transport-controls">
-    <button id="playPause" type="button">▶ Play</button>
-    <button id="stopPlayback" type="button">■ Stop</button>
-    <span id="transport-status" aria-live="polite">Ready</span>
+  <div id="audio-control"></div>
+  <div id="tempo-control">
+    <label for="tempo">Tempo</label>
+    <input id="tempo" type="number" min="40" max="240" step="1" value="150" aria-label="Tempo in beats per minute">
+    <span>BPM</span>
   </div>
-  <div id="transport-progress" aria-hidden="true"><div id="transport-progress-fill"></div></div>
 </section>
 
 <section id="score-section">
