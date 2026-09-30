@@ -1,56 +1,112 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Factorial Melody</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.3/dist/abcjs-basic-min.js"></script>
-</head>
-<body>
-<main class="page">
-  <header class="header">
-    <div class="eyebrow">GENERATOR PROTOTYPE</div>
-    <div class="headrow">
-      <div>
-        <h1>Factorial Melody</h1>
-        <p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p>
-      </div>
-      <div class="actions">
-        <button id="generate" class="primary">GENERATE</button>
-        <button id="rhythms">RANDOMIZE RHYTHMS</button>
-        <button id="pentas">SHUFFLE PENTATONICS</button>
-      </div>
-    </div>
-    <div class="rule"></div>
-    <div class="subhead">G3–C6 · maximum leap one octave · all five pitch classes used · Measures 6 &amp; 21 improvise</div>
-  </header>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css">
 
-  <section class="transport">
-    <div class="transport-row">
-      <button id="playPause" class="primary">▶ Play</button>
-      <button id="stopPlayback">■ Stop</button>
-      <span id="transportStatus">Ready</span>
-    </div>
-    <div class="tempo-row">
-      <label for="tempo">Tempo</label>
-      <input id="tempo" type="number" min="40" max="240" value="150" step="1">
-      <span>BPM</span>
-    </div>
-  </section>
 
-  <section class="chart-card">
-    <div id="notation"></div>
-    <div id="notationError" class="notation-error" hidden></div>
-  </section>
+<style>
+#score-section{
+    margin:18px 0 36px;
+    background:#fff;
+    overflow-x:auto;
+    padding:10px 0 14px;
+}
+#score{
+    width:100%;
+    min-width:1120px;
+}
+#score svg{
+    display:block;
+    margin:0 auto;
+}
+#score .abcjs-note{
+    fill:#111;
+}
+#score .abcjs-staff{
+    stroke:#111;
+}
+#score .abcjs-bar{
+    stroke:#111;
+}
+#score .abcjs-chord{
+    font-family:Arial,Helvetica,sans-serif;
+    font-weight:600;
+}
+.score-error{
+    padding:42px 20px;
+    text-align:center;
+    color:#555;
+    font-family:Arial,Helvetica,sans-serif;
+}
+</style>
 
-  <section class="data-card">
-    <table>
-      <thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead>
-      <tbody id="output"></tbody>
-    </table>
-  </section>
-</main>
-<script src="script.js"></script>
-</body>
-</html>
+<style>
+#transport{
+    margin:16px 0 12px;
+    padding:10px 0 12px;
+    border-top:1px solid #ddd;
+    border-bottom:1px solid #ddd;
+}
+#transport-controls{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:40px;
+}
+#transport-controls button{
+    appearance:none;
+    border:1px solid #222;
+    background:#fff;
+    color:#111;
+    padding:9px 14px;
+    font:600 14px Arial,Helvetica,sans-serif;
+    cursor:pointer;
+}
+#transport-controls #playPause{
+    background:#111;
+    color:#fff;
+}
+#transport-controls button:disabled{
+    opacity:.45;
+    cursor:default;
+}
+#transport-status{
+    margin-left:6px;
+    color:#666;
+    font:13px Arial,Helvetica,sans-serif;
+}
+#tempo-control{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    margin-top:8px;
+    font:13px Arial,Helvetica,sans-serif;
+    color:#555;
+}
+#tempo-control label{
+    color:#111;
+    font-weight:600;
+}
+#tempo{
+    width:72px;
+    padding:6px 7px;
+    border:1px solid #bbb;
+    font:13px Arial,Helvetica,sans-serif;
+}
+</style>
+
+</head><body><main><header><div><small>GENERATOR PROTOTYPE</small><h1>Factorial Melody</h1><p>24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation</p></div><div><button id="generate">GENERATE</button><button id="rhythms">RANDOMIZE RHYTHMS</button><button id="pentas">SHUFFLE PENTATONICS</button></div></header><p class="rules">G3–G4 · maximum leap one octave · all five pitch classes used · Measures 6 & 21 improvise</p>
+<section id="transport" aria-label="Playback controls">
+  <div id="transport-controls">
+    <button id="playPause" type="button">▶ Play</button>
+    <button id="stopPlayback" type="button">■ Stop</button>
+    <span id="transport-status">Ready</span>
+  </div>
+  <div id="tempo-control">
+    <label for="tempo">Tempo</label>
+    <input id="tempo" type="number" min="40" max="240" step="1" value="150">
+    <span>BPM</span>
+  </div>
+</section>
+<section id="score-section">
+  <div id="score"></div>
+</section>
+<table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
+<script src="script.js"></script></body></html>
