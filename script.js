@@ -649,8 +649,7 @@ function renderScore(){
             "score",
             abc,
             {
-                responsive:"resize",
-                staffwidth:1120,
+                staffwidth:1400,
                 scale:1.15,
                 add_classes:true,
                 paddingtop:12,
