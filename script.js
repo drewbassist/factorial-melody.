@@ -483,7 +483,7 @@ function measureToABC(index){
         else if(token==="Q.") specs.push("6");
         else if(token==="E") specs.push("2");
         else if(token==="EE") specs.push("2","2");
-        else if(token==="EEEE") specs.push("1","1","1","1");
+        else if(token==="EEEE") specs.push("2","2","2","2");
     });
 
     const generated=notes[index];
@@ -551,9 +551,8 @@ K:C
 
 function abcPitch(p){
 
-    const pitch = (typeof p==="string") ? p : p.s;
-    const m=pitch.match(/^([A-G])([#b]?)(\d)$/);
-    if(!m) throw Error("Invalid pitch: "+pitch);
+    const m=p.match(/^([A-G])([#b]?)(\d)$/);
+    if(!m) throw Error("Invalid pitch: "+p);
 
     const letter=m[1];
     const accidental=m[2];
@@ -597,7 +596,7 @@ function abcMeasure(index){
     const tokens=rhythmTokens(rhythm);
 
     if(index===5 || index===20){
-        return "z8 z8 z8 z8";
+        return "z8";
     }
 
     const pitches=notes[index] || [];
@@ -665,7 +664,7 @@ function buildABC(){
 
         // Keep the two improv measures visibly open.
         if(i===5 || i===20){
-            bar=`"${chord}" z8 z8 z8 z8 |`;
+            bar=`"${chord}" z8 |`;
         }
 
         abc.push(bar);
@@ -743,27 +742,173 @@ function renderScore(){
 }
 
 
-// Controls
+/* ============================================================
+   AUDIO TRANSPORT
+   ============================================================ */
+
+let audioSynth=null;
+let audioState="stopped";
+let audioLoading=false;
+
+function getTempo(){
+    const el=document.querySelector("#tempo");
+    let bpm=el ? Number(el.value) : 150;
+    if(!Number.isFinite(bpm)) bpm=150;
+    bpm=Math.round(Math.max(40,Math.min(240,bpm)));
+    if(el) el.value=bpm;
+    return bpm;
+}
+
+function setTransportState(state){
+    audioState=state;
+
+    const play=document.querySelector("#playPause");
+    const status=document.querySelector("#transport-status");
+
+    if(!play || !status) return;
+
+    if(state==="playing"){
+        play.textContent="Ⅱ Pause";
+        status.textContent="Playing";
+    }else if(state==="paused"){
+        play.textContent="▶ Resume";
+        status.textContent="Paused";
+    }else if(state==="loading"){
+        play.textContent="▶ Play";
+        status.textContent="Loading audio…";
+    }else{
+        play.textContent="▶ Play";
+        status.textContent="Ready";
+    }
+}
+
+function makePlaybackVisual(){
+    const abc=buildABC();
+    const rendered=ABCJS.renderAbc("*",abc,{add_classes:false});
+
+    if(!rendered || !rendered[0]){
+        throw Error("Could not prepare the generated music for playback.");
+    }
+
+    return rendered[0];
+}
+
+async function playPause(){
+
+    if(audioState==="playing"){
+        if(audioSynth){
+            audioSynth.pause();
+            setTransportState("paused");
+        }
+        return;
+    }
+
+    if(audioState==="paused"){
+        if(audioSynth){
+            audioSynth.resume();
+            setTransportState("playing");
+        }
+        return;
+    }
+
+    if(audioLoading) return;
+
+    try{
+        audioLoading=true;
+        setTransportState("loading");
+
+        // This occurs inside the user's Play click, satisfying the browser's
+        // AudioContext user-gesture requirement.
+        const visualObj=makePlaybackVisual();
+        const bpm=getTempo();
+        const millisecondsPerMeasure=(60000/bpm)*4;
+
+        audioSynth=new ABCJS.synth.CreateSynth();
+
+        await audioSynth.init({
+            visualObj:visualObj,
+            millisecondsPerMeasure:millisecondsPerMeasure,
+            options:{
+                program:0
+            }
+        });
+
+        await audioSynth.prime();
+        audioSynth.start();
+
+        setTransportState("playing");
+
+    }catch(error){
+
+        console.error("Playback error:",error);
+        audioSynth=null;
+        setTransportState("stopped");
+
+        const status=document.querySelector("#transport-status");
+        if(status){
+            status.textContent="Audio error — click Play again";
+        }
+
+    }finally{
+        audioLoading=false;
+    }
+}
+
+function stopPlayback(){
+
+    if(audioSynth){
+        try{
+            audioSynth.stop();
+        }catch(error){
+            console.error("Stop error:",error);
+        }
+    }
+
+    audioSynth=null;
+    audioLoading=false;
+    setTransportState("stopped");
+}
+
+async function changeTempo(){
+    const wasPlaying=audioState==="playing";
+    stopPlayback();
+
+    if(wasPlaying){
+        await playPause();
+    }
+}
+
+document.querySelector("#playPause").onclick=playPause;
+document.querySelector("#stopPlayback").onclick=stopPlayback;
+
+const tempoControl=document.querySelector("#tempo");
+if(tempoControl){
+    tempoControl.addEventListener("change",changeTempo);
+    tempoControl.addEventListener("blur",getTempo);
+}
+
+
+/* ============================================================
+   GENERATOR CONTROLS
+   ============================================================ */
+
 document.querySelector("#generate").onclick=()=>{
-    stopAudio();
+    stopPlayback();
     generateAll();
-    refreshAudio();
 };
 
 document.querySelector("#rhythms").onclick=()=>{
-    stopAudio();
+    stopPlayback();
     ro=shuffle(R);
     makeNotes();
     render();
-    refreshAudio();
 };
 
 document.querySelector("#pentas").onclick=()=>{
-    stopAudio();
+    stopPlayback();
     sel=B.map(b=>b[1].length ? pick(b[1]) : null);
     makeNotes();
     render();
-    refreshAudio();
 };
 
 generateAll();
