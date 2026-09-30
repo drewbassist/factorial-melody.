@@ -374,34 +374,6 @@ function generateAll(){
     render();
 }
 
-document.querySelector("#generate").onclick=generateAll;
-
-document.querySelector("#rhythms").onclick=()=>{
-
-    ro=shuffle(R);
-
-    // Rhythm randomization can change the number of attacks.
-    // Regenerate pitches so every attack has a corresponding pitch.
-    makeNotes();
-
-    render();
-};
-
-document.querySelector("#pentas").onclick=()=>{
-
-    sel=B.map(b=>
-        b[1].length
-            ? pick(b[1])
-            : null
-    );
-
-    makeNotes();
-
-    render();
-};
-
-generateAll();
-
 /* ============================================================
    FACTORIAL MELODY — ABCJS CHART RENDERER
    ============================================================ */
@@ -590,6 +562,7 @@ function buildABC(){
         "T:24-Bar Generated Exercise",
         "M:4/4",
         "L:1/8",
+        "Q:1/4=150",
         "K:C",
         "%%barnumbers 1",
         "%%measurefirst 1",
@@ -649,14 +622,14 @@ function renderScore(){
             "score",
             abc,
             {
-                responsive:"resize",
-                staffwidth:1120,
-                scale:1.15,
+                staffwidth:1400,
+                scale:1.05,
                 add_classes:true,
+                oneSvgPerLine:true,
                 paddingtop:12,
-                paddingbottom:8,
-                paddingleft:12,
-                paddingright:12,
+                paddingbottom:18,
+                paddingleft:20,
+                paddingright:20,
                 lineBreaks:[4,8,12,16,20,24]
             }
         );
@@ -772,7 +745,13 @@ async function playPause(){
             visualObj:visualObj,
             millisecondsPerMeasure:millisecondsPerMeasure,
             options:{
-                program:0
+                program:0,
+                qpm:bpm,
+                onEnded:()=>{
+                    audioSynth=null;
+                    audioLoading=false;
+                    setTransportState("stopped");
+                }
             }
         });
 
