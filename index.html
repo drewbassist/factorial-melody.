@@ -1,17 +1,31 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factorial Melody Prototype</title><link rel="stylesheet" href="style.css"><style>
 #score-section{
-    margin:18px 0 34px;
+    margin:20px 0 38px;
     background:#fff;
     overflow-x:auto;
-    padding:0 0 8px;
+    padding:4px 0 8px;
 }
 #score{
-    min-width:1240px;
     width:100%;
+    min-width:1120px;
 }
 #score svg{
     display:block;
-    margin:0 auto;
+    width:100%;
+    height:auto;
+}
+.abcjs-title{
+    font-family:Georgia,"Times New Roman",serif !important;
+    font-weight:700;
+}
+.score-error{
+    padding:30px;
+    border:1px solid #d9d9d9;
+    text-align:center;
+    color:#555;
+}
+.improv-label{
+    display:none;
 }
 </style>
 
@@ -19,4 +33,5 @@
 <section id="score-section">
   <div id="score"></div>
 </section>
-<table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="script.js"></script></body></html>
+<table><thead><tr><th>Measure</th><th>Chord</th><th>Rhythm</th><th>Transcription</th><th>Pentatonic</th><th>Generated attacks</th></tr></thead><tbody id="output"></tbody></table></main><script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
+<script src="script.js"></script></body></html>
