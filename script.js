@@ -817,6 +817,7 @@ function renderScore(){
             system.style.clear="both";
             system.style.margin="0 0 18px 0";
             system.style.overflow="hidden";
+            system.style.position="relative";
 
             scoreWrap.appendChild(system);
 
@@ -844,11 +845,15 @@ function renderScore(){
                     .replace(/♯/g,"#");
 
 
-                const bar=(i===5 || i===20)
+                let bar;
 
-                    ? `"${chord}" z8 |`
-
-                    : `"${chord}" ${abcMeasure(i)} |`;
+                if(i===20){
+                    bar=`"Dm7" z4 "Db7" z4 |`;
+                }else if(i===5){
+                    bar=`"${chord}" z8 |`;
+                }else{
+                    bar=`"${chord}" ${abcMeasure(i)} |`;
+                }
 
 
                 bars.push(bar);
@@ -904,6 +909,14 @@ function renderScore(){
             system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
                 el.textContent=String(first+index+2);
             });
+
+            // ABCJS does not draw a number over the first measure of an
+            // independently rendered system. Add that missing number so all
+            // measures 1-24 are visibly numbered.
+            const firstBarNumber=document.createElement("div");
+            firstBarNumber.className="fg-first-bar-number";
+            firstBarNumber.textContent=String(first+1);
+            system.appendChild(firstBarNumber);
 
 
         }
@@ -1231,7 +1244,20 @@ async function playWithSoundFonts(){
     let melodyTime=startTime;
     for(let i=0;i<B.length;i++){
         const barStart=startTime+i*barDur;
-        playAccompanimentChord(B[i][0],barStart,barDur);
+
+        if(i===20){
+            // Measure 21: Dm7 on beats 1-2, Db7 on beats 3-4.
+            const halfBar=barDur/2;
+            const playFixedChord=(voicing,start,dur)=>{
+                voicing.forEach(midi=>
+                    playSample(accompanimentInstrument,midi,start,dur,0.105,accompanimentMaster)
+                );
+            };
+            playFixedChord([53,57,60,62],barStart,halfBar);
+            playFixedChord([53,56,59,61],barStart+halfBar,halfBar);
+        }else{
+            playAccompanimentChord(B[i][0],barStart,barDur);
+        }
 
         const tokens=rhythmTokens(ro[i][1]);
         if(i===5 || i===20){
@@ -1498,8 +1524,18 @@ function modernizeControls(){
                 display:flex !important;
                 align-items:center !important;
                 flex-wrap:wrap !important;
-                gap:10px !important;
+                column-gap:12px !important;
+                row-gap:10px !important;
                 width:100% !important;
+            }
+            .fg-first-bar-number{
+                position:absolute;
+                left:92px;
+                top:43px;
+                z-index:2;
+                font:italic 13px/1 Georgia,"Times New Roman",serif;
+                color:#171717;
+                pointer-events:none;
             }
             .fg-control-row .fg-modern-button{
                 appearance:none;
