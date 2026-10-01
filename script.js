@@ -949,7 +949,7 @@ function renderScore(){
                 number.textContent=String(first+localBar+1);
 
                 const leftBar=uniqueBarlines[localBar];
-                const x=leftBar ? leftBar.x+7 : 92+localBar*((svgWidth-116)/4);
+                const x=92;
                 number.style.left=`${x/svgWidth*100}%`;
                 number.style.top=`${numberTop}px`;
                 system.appendChild(number);
