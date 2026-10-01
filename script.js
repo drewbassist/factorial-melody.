@@ -915,7 +915,7 @@ function renderScore(){
             const barWidth=usableWidth/4;
             // Place numbers in the conventional lead-sheet position:
             // just above the staff and below the chord symbol.
-            const numberTop=Math.round(svgHeight*0.34);
+            const numberTop=Math.round(svgHeight*0.62);
 
             system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
                 el.textContent=String(first+index+2);
