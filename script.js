@@ -650,7 +650,7 @@ function buildABC(){
 
     const header=[
         "X:1",
-        "T:Factorial Melody",
+        "T:Falling Grace Pentatonic Generator",
         "T:24-Bar Generated Exercise",
         "M:4/4",
         "L:1/8",
@@ -820,14 +820,14 @@ function renderScore(){
             const abc=[
                 "X:1",
                 group===0
-                    ? "T:Factorial Melody"
+                    ? "T:Falling Grace Pentatonic Generator"
                     : "T:",
                 group===0
                     ? "T:24-Bar Generated Exercise"
                     : "T:",
                 "M:4/4",
                 "L:1/8",
-                `Q:1/4=${getTempo()}`,
+                ...(group===0 ? [`Q:1/4=${getTempo()}`] : []),
                 "K:C",
                 "%%barnumbers 1",
                 "%%measurefirst 1",
@@ -1224,7 +1224,25 @@ async function changeTempo(){
 }
 
 
+function updateDisplayLabels(){
+    // Display text only. Generator, rhythm, pitch, playback, and layout logic stay unchanged.
+    document.title="Falling Grace Pentatonic Generator";
+
+    const h1=document.querySelector("h1");
+    if(h1) h1.textContent="Falling Grace Pentatonic Generator";
+
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    let node;
+    while((node=walker.nextNode())){
+        if(node.nodeValue && /G3\s*[–-]\s*G4/.test(node.nodeValue)){
+            node.nodeValue=node.nodeValue.replace(/G3\s*[–-]\s*G4/g,"E3–Eb5");
+        }
+    }
+}
+
 async function initApp(){
+
+    updateDisplayLabels();
 
 /* ============================================================
    EVENT HANDLERS
