@@ -819,12 +819,6 @@ function renderScore(){
 
             const abc=[
                 "X:1",
-                group===0
-                    ? "T:Falling Grace Pentatonic Generator"
-                    : "T:",
-                group===0
-                    ? "T:24-Bar Generated Exercise"
-                    : "T:",
                 "M:4/4",
                 "L:1/8",
                 ...(group===0 ? [`Q:1/4=${getTempo()}`] : []),
@@ -1226,18 +1220,30 @@ async function changeTempo(){
 
 function updateDisplayLabels(){
     // Display text only. Generator, rhythm, pitch, playback, and layout logic stay unchanged.
-    document.title="Falling Grace Pentatonic Generator";
+    document.title="Falling Grace";
 
     const h1=document.querySelector("h1");
-    if(h1) h1.textContent="Falling Grace Pentatonic Generator";
+    if(h1) h1.textContent="Falling Grace";
 
-    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-    let node;
-    while((node=walker.nextNode())){
-        if(node.nodeValue && /G3\s*[–-]\s*G4/.test(node.nodeValue)){
-            node.nodeValue=node.nodeValue.replace(/G3\s*[–-]\s*G4/g,"E3–Eb5");
+    // Update/remove only the existing descriptive copy requested by the user.
+    const all=[...document.querySelectorAll("body *")];
+
+    all.forEach(el=>{
+        // Only inspect leaf elements so parent containers are never removed accidentally.
+        if(el.children.length) return;
+
+        const text=(el.textContent || "").trim();
+
+        if(text==="24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation"){
+            el.textContent="pentatonic and 24 rhythmic generator";
+            return;
         }
-    }
+
+        if(/^E3\s*[–-]\s*Eb5\s*·\s*maximum leap one octave\s*·\s*all five pitch classes used\s*·\s*Measures 6 & 21 improvise$/i.test(text) ||
+           /^G3\s*[–-]\s*G4\s*·\s*maximum leap one octave\s*·\s*all five pitch classes used\s*·\s*Measures 6 & 21 improvise$/i.test(text)){
+            el.style.display="none";
+        }
+    });
 }
 
 async function initApp(){
