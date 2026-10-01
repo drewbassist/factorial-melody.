@@ -225,6 +225,8 @@ let notes=[];
 let audioSynth=null;
 let audioLoading=false;
 let audioState="stopped";
+let melodySound="rhodes";
+let accompanimentSound="piano";
 
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 
@@ -1048,34 +1050,15 @@ function padIntervals(chord){
     return [0,4,7];
 }
 
-// Fixed accompaniment voicings. These are deliberately deterministic: the same
-// generated exercise always uses the same smooth voice-led chord shapes.
+// Fixed accompaniment voicings for smooth, deterministic voice leading.
 // Each entry is a MIDI-note voicing for the corresponding bar (1-24).
 const ACCOMP_VOICINGS=[
-    [55,60,63,68], // 1  AbM7
-    [55,59,63,68], // 2  AbmM7
-    [54,60,62,69], // 3  D7/F#
-    [53,58,62,67], // 4  Gm7
-    [53,56,62,70], // 5  Bb7
-    [55,58,63,67], // 6  Eb/G (first chord shown in the bar)
-    [53,58,62,67], // 7  Gm7/F
-    [52,55,60,64], // 8  C/E
-    [52,57,60,65], // 9  FM7
-    [52,54,57,60], // 10 F#m7b5
-    [51,57,59,66], // 11 B7
-    [52,55,59,62], // 12 Em7
-    [54,57,60,62], // 13 D7
-    [54,59,62,66], // 14 GM7
-    [51,55,58,60], // 15 Cm7
-    [52,55,58,61], // 16 C#dim7
-    [53,57,58,62], // 17 BbM7
-    [55,58,62,63], // 18 EbM7
-    [55,59,62,64], // 19 Em7
-    [55,57,61,64], // 20 A7
-    [53,57,60,62], // 21 Dm7 (first chord shown in the bar)
-    [53,56,58,62], // 22 F7
-    [53,57,58,62], // 23 BbM7
-    [55,58,62,63]  // 24 EbM7
+    [55,60,63,68], [55,59,63,68], [54,60,62,69], [53,58,62,67],
+    [53,56,62,70], [55,58,63,67], [53,58,62,67], [52,55,60,64],
+    [52,57,60,65], [52,54,57,60], [51,57,59,66], [52,55,59,62],
+    [54,57,60,62], [54,59,62,66], [51,55,58,60], [52,55,58,61],
+    [53,57,58,62], [55,58,62,63], [55,59,62,64], [55,57,61,64],
+    [53,57,60,62], [53,56,58,62], [53,57,58,62], [55,58,62,63]
 ];
 
 function playWithWebAudio(){
@@ -1106,48 +1089,83 @@ function playWithWebAudio(){
     const barDur=beat*4;
     const startTime=ctx.currentTime+0.08;
 
-    // Rhodes-like melody: a soft sine fundamental plus a quieter triangle overtone,
-    // with a quick attack and rounded electric-piano decay.
-    const playRhodes=(midi,start,dur)=>{
+    // Selectable Web Audio melody voices.
+    const playMelodyVoice=(midi,start,dur)=>{
         if(audioSynth.stopped) return;
+        const sound=melodySound;
         const master=ctx.createGain();
         master.gain.setValueAtTime(0.0001,start);
-        master.gain.exponentialRampToValueAtTime(0.13,start+0.012);
-        master.gain.exponentialRampToValueAtTime(0.055,start+Math.min(0.16,dur*0.35));
-        master.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.04,start+dur-0.015));
+
+        if(sound==="vibraphone"){
+            master.gain.exponentialRampToValueAtTime(0.11,start+0.006);
+            master.gain.exponentialRampToValueAtTime(0.0001,start+Math.max(0.16,dur));
+        }else if(sound==="warm-synth"){
+            master.gain.exponentialRampToValueAtTime(0.10,start+0.025);
+            master.gain.exponentialRampToValueAtTime(0.06,start+Math.min(0.18,dur*0.35));
+            master.gain.exponentialRampToValueAtTime(0.0001,start+Math.max(0.12,dur));
+        }else{
+            master.gain.exponentialRampToValueAtTime(0.13,start+0.012);
+            master.gain.exponentialRampToValueAtTime(0.055,start+Math.min(0.16,dur*0.35));
+            master.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.04,start+dur-0.015));
+        }
         master.connect(ctx.destination);
 
-        [["sine",1,1.0],["triangle",2,0.16]].forEach(([type,mult,level])=>{
+        const partials = sound==="vibraphone"
+            ? [["sine",1,1.0],["sine",3,0.12]]
+            : sound==="warm-synth"
+                ? [["sawtooth",1,0.42],["triangle",1,0.58]]
+                : [["sine",1,1.0],["triangle",2,0.16]];
+
+        partials.forEach(([type,mult,level])=>{
             const osc=ctx.createOscillator();
             const g=ctx.createGain();
             osc.type=type;
             osc.frequency.value=midiToFrequency(midi)*mult;
             g.gain.value=level;
             osc.connect(g); g.connect(master);
-            osc.start(start); osc.stop(start+dur);
+            osc.start(start); osc.stop(start+Math.max(0.08,dur));
             audioSynth.oscillators.push(osc);
             audioSynth.gains.push(g);
         });
         audioSynth.gains.push(master);
     };
 
-    // Accompaniment: one soft piano-like chord attack at the start of each bar.
-    const playPianoChord=(chord,start,dur)=>{
+    // Selectable accompaniment voices. Each remains one chord attack per measure.
+    const playAccompanimentChord=(chord,start,dur)=>{
         const primary=String(chord).trim().split(/\s{2,}/)[0];
+        const sound=accompanimentSound;
         const barIndex=Math.max(0,Math.min(B.length-1,Math.round((start-startTime)/barDur)));
         const fixedVoicing=ACCOMP_VOICINGS[barIndex];
         const chordNotes=fixedVoicing || padIntervals(primary).map(interval=>chordRootMidi(primary)+interval);
+
         chordNotes.forEach((midi,idx)=>{
             const osc=ctx.createOscillator();
             const gain=ctx.createGain();
-            osc.type=idx%2 ? "sine" : "triangle";
+
+            if(sound==="pad"){
+                osc.type=idx%2 ? "sine" : "triangle";
+                gain.gain.setValueAtTime(0.0001,start);
+                gain.gain.exponentialRampToValueAtTime(0.022,start+0.12);
+                gain.gain.setValueAtTime(0.018,start+Math.max(0.13,dur-0.18));
+                gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+            }else if(sound==="rhodes"){
+                osc.type=idx%2 ? "sine" : "triangle";
+                gain.gain.setValueAtTime(0.0001,start);
+                gain.gain.exponentialRampToValueAtTime(0.03,start+0.012);
+                gain.gain.exponentialRampToValueAtTime(0.009,start+Math.min(0.28,dur*0.25));
+                gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.5));
+            }else{
+                osc.type=idx%2 ? "sine" : "triangle";
+                gain.gain.setValueAtTime(0.0001,start);
+                gain.gain.exponentialRampToValueAtTime(0.035,start+0.008);
+                gain.gain.exponentialRampToValueAtTime(0.012,start+Math.min(0.22,dur*0.18));
+                gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.15));
+            }
+
             osc.frequency.value=midiToFrequency(midi);
-            gain.gain.setValueAtTime(0.0001,start);
-            gain.gain.exponentialRampToValueAtTime(0.035,start+0.008);
-            gain.gain.exponentialRampToValueAtTime(0.012,start+Math.min(0.22,dur*0.18));
-            gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.15));
             osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(start); osc.stop(start+Math.min(dur,1.2));
+            osc.start(start);
+            osc.stop(start+(sound==="pad" ? dur : Math.min(dur,sound==="rhodes" ? 1.55 : 1.2)));
             audioSynth.oscillators.push(osc);
             audioSynth.gains.push(gain);
         });
@@ -1156,7 +1174,7 @@ function playWithWebAudio(){
     let melodyTime=startTime;
     for(let i=0;i<B.length;i++){
         const barStart=startTime+i*barDur;
-        playPianoChord(B[i][0],barStart,barDur);
+        playAccompanimentChord(B[i][0],barStart,barDur);
 
         const tokens=rhythmTokens(ro[i][1]);
         if(i===5 || i===20){
@@ -1168,17 +1186,17 @@ function playWithWebAudio(){
             if(token==="EE"){
                 for(let k=0;k<2;k++){
                     const n=notes[i][p++];
-                    playRhodes(n.m,melodyTime,beat/2); melodyTime+=beat/2;
+                    playMelodyVoice(n.m,melodyTime,beat/2); melodyTime+=beat/2;
                 }
             }else if(token==="EEEE"){
                 for(let k=0;k<4;k++){
                     const n=notes[i][p++];
-                    playRhodes(n.m,melodyTime,beat/2); melodyTime+=beat/2;
+                    playMelodyVoice(n.m,melodyTime,beat/2); melodyTime+=beat/2;
                 }
             }else{
                 const n=notes[i][p++];
                 const d=token==="E" ? beat/2 : token==="Q" ? beat : beat*1.5;
-                playRhodes(n.m,melodyTime,d); melodyTime+=d;
+                playMelodyVoice(n.m,melodyTime,d); melodyTime+=d;
             }
         }
     }
@@ -1330,6 +1348,35 @@ function modernizeControls(){
     generate.classList.add("fg-primary-button");
     play.classList.add("fg-play-button");
 
+    // Sound selectors only: these change playback timbre, not generated music or notation.
+    const makeSoundSelect=(id,label,options,value,onChange)=>{
+        let wrap=document.querySelector("#"+id+"-wrap");
+        if(wrap) return;
+        wrap=document.createElement("label");
+        wrap.id=id+"-wrap";
+        wrap.className="fg-sound-control";
+        wrap.append(document.createTextNode(label+" "));
+        const select=document.createElement("select");
+        select.id=id;
+        options.forEach(([v,t])=>{
+            const option=document.createElement("option");
+            option.value=v; option.textContent=t;
+            if(v===value) option.selected=true;
+            select.appendChild(option);
+        });
+        select.addEventListener("change",()=>{ stopPlayback(); onChange(select.value); });
+        wrap.appendChild(select);
+        playParent.appendChild(wrap);
+    };
+
+    makeSoundSelect("melodySound","Melody",[
+        ["rhodes","Rhodes"],["vibraphone","Vibraphone"],["warm-synth","Warm Synth"]
+    ],melodySound,value=>{ melodySound=value; });
+
+    makeSoundSelect("accompanimentSound","Accompaniment",[
+        ["piano","Piano"],["rhodes","Rhodes"],["pad","Pad"]
+    ],accompanimentSound,value=>{ accompanimentSound=value; });
+
     // Remove any now-empty wrapper that previously held the generator buttons.
     const candidates=[generate,rhythms,pentas].map(b=>b.parentElement);
     document.querySelectorAll("body *").forEach(el=>{
@@ -1383,6 +1430,24 @@ function modernizeControls(){
             .fg-control-row .fg-play-button:hover{
                 background:#303030 !important;
                 border-color:#303030 !important;
+            }
+            .fg-sound-control{
+                display:flex !important;
+                align-items:center !important;
+                gap:6px !important;
+                font:600 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+                color:#555 !important;
+                white-space:nowrap !important;
+            }
+            .fg-sound-control select{
+                min-height:38px !important;
+                padding:0 28px 0 10px !important;
+                border:1px solid #d0d0d0 !important;
+                border-radius:8px !important;
+                background:#fff !important;
+                color:#171717 !important;
+                font:600 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+                cursor:pointer !important;
             }
             @media (max-width:900px){
                 .fg-control-row{gap:8px !important;}
