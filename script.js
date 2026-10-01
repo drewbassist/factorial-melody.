@@ -612,107 +612,62 @@ function renderScore(){
         });
 
         /*
-         * Engrave SIX INDEPENDENT SYSTEMS. Each ABC string contains exactly
-         * four measures, so ABCJS has no opportunity to wrap 24 measures
-         * into an arbitrary number of bars per line.
+         * ABCJS-NATIVE SYSTEM BREAKING
+         *
+         * Render the complete 24-bar exercise as ONE ABC tune and tell
+         * ABCJS explicitly to place exactly four measures on every staff.
+         *
+         * This is deliberately not implemented with six separate SVGs.
+         * %%barsperstaff 4 is the ABCJS/ABC formatting directive that
+         * controls the number of measures per staff line.
          */
-        const scoreWrap=document.createElement("div");
-        scoreWrap.className="score-systems";
-        // Force the six systems into a single vertical column.
-        // This deliberately overrides any inherited flex/grid layout from the page.
-        scoreWrap.style.display="flex";
-        scoreWrap.style.flexDirection="column";
-        scoreWrap.style.flexWrap="nowrap";
-        scoreWrap.style.alignItems="stretch";
-        scoreWrap.style.width="100%";
-        scoreWrap.style.maxWidth="100%";
-        scoreWrap.style.clear="both";
-        container.appendChild(scoreWrap);
+        const abc=[
+            "X:1",
+            "T:Factorial Melody",
+            "T:24-Bar Generated Exercise",
+            "M:4/4",
+            "L:1/8",
+            `Q:1/4=${getTempo()}`,
+            "K:C",
+            "%%barsperstaff 4",
+            "%%barnumbers 1",
+            "%%measurefirst 1",
+            "%%stretchlast 1"
+        ];
 
-        const availableWidth=Math.max(900, Math.min(1500, container.clientWidth || 1400));
+        for(let i=0;i<24;i++){
+            const chord=B[i][0]
+                .replace(/♭/g,"b")
+                .replace(/♯/g,"#");
 
-        for(let group=0; group<6; group++){
-            const first=group*4;
-            const last=first+4;
+            // Measures 6 and 21 remain completely open improvisation bars.
+            const bar=(i===5 || i===20)
+                ? `"${chord}" z8 |`
+                : `"${chord}" ${abcMeasure(i)} |`;
 
-            const system=document.createElement("div");
-            system.className="score-system";
-            system.dataset.measures=`${first+1}-${last}`;
-            system.style.display="block";
-            system.style.flex="0 0 auto";
-            system.style.width="100%";
-            system.style.maxWidth="100%";
-            system.style.minWidth="0";
-            system.style.overflowX="auto";
-            system.style.clear="both";
-            system.style.marginBottom="18px";
-            scoreWrap.appendChild(system);
-
-            const abc=[
-                "X:1",
-                group===0 ? "T:Factorial Melody" : "T:",
-                group===0 ? "T:24-Bar Generated Exercise" : "T:",
-                "M:4/4",
-                "L:1/8",
-                `Q:1/4=${getTempo()}`,
-                "K:C",
-                "%%barnumbers 1",
-                "%%measurefirst 1",
-                "%%stretchlast 1"
-            ];
-
-            for(let i=first;i<last;i++){
-                const chord=B[i][0]
-                    .replace(/♭/g,"b")
-                    .replace(/♯/g,"#");
-
-                // Measures 6 and 21 remain completely open improvisation bars.
-                const bar=(i===5 || i===20)
-                    ? `"${chord}" z8 |`
-                    : `"${chord}" ${abcMeasure(i)} |`;
-
-                abc.push(bar);
-            }
-
-            ABCJS.renderAbc(
-                system,
-                abc.join("\n"),
-                {
-                    /*
-                     * IMPORTANT:
-                     * Each system is rendered from exactly four measures.
-                     * Give ABCJS enough horizontal staff width that those
-                     * four measures cannot wrap onto a second line.
-                     */
-                    // Four measures must occupy one complete system.
-                    // Use the actual score width, not an oversized 1400px staff.
-                    staffwidth:Math.max(900, availableWidth-40),
-                    scale:1.05,
-                    add_classes:true,
-                    oneSvgPerLine:true,
-                    lineBreaks:[4],
-                    paddingtop:group===0 ? 8 : 2,
-                    paddingbottom:14,
-                    paddingleft:20,
-                    paddingright:20
-                }
-            );
-
-            // Renumber each independently rendered system to its true measure numbers.
-            const numbers=system.querySelectorAll(".abcjs-bar-number");
-            numbers.forEach((el,index)=>{
-                el.textContent=String(first+index+1);
-            });
-
-            // Make the rendered SVG a block-level object occupying this system only.
-            // This prevents browser/CSS layout from placing subsequent systems beside it.
-            system.querySelectorAll("svg").forEach(svg=>{
-                svg.style.display="block";
-                svg.style.width="100%";
-                svg.style.height="auto";
-                svg.style.maxWidth="none";
-            });
+            abc.push(bar);
         }
+
+        /*
+         * Keep the score wide enough for four measures while allowing the
+         * existing page/container CSS to determine the actual display size.
+         * %%barsperstaff 4 is what guarantees the four-measure systems.
+         */
+        ABCJS.renderAbc(
+            container,
+            abc.join("\n"),
+            {
+                staffwidth:Math.max(1200, container.clientWidth || 1400),
+                scale:1.05,
+                add_classes:true,
+                oneSvgPerLine:true,
+                paddingtop:8,
+                paddingbottom:14,
+                paddingleft:20,
+                paddingright:20
+            }
+        );
+
     }catch(err){
         container.innerHTML="";
         const msg=document.createElement("div");
