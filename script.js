@@ -247,7 +247,7 @@ function candidates(n){
 
         let m=12*(o+1)+PC[n];
 
-        if(m>=55 && m<=67){
+        if(m>=52 && m<=75){
             a.push({
                 s:n+o,
                 m:m
@@ -565,60 +565,80 @@ function abcMeasure(index){
     const attacks=attackCount(rhythm);
 
     if(pitches.length!==attacks){
-
         throw Error(
             `Measure ${index+1}: ${attacks} attacks vs ${pitches.length} pitches`
         );
     }
 
-    let p=0;
-    const out=[];
-
     /*
-     * IMPORTANT:
-     * The previous version omitted ABC duration values from E/EE/EEEE.
-     * With L:1/8, every eighth note must explicitly have duration 1.
-     * Quarter = 2, dotted quarter = 3.
+     * Build atomic note events first, then apply beaming from their
+     * metrical positions. In 4/4, eighth notes are beamed only with
+     * the other eighth note in the same quarter-note beat. Spaces in
+     * ABC break beams; adjacent eighth-note symbols form a beam.
      *
-     * The missing durations made the ABC string invalid/incorrect and
-     * could leave the score area blank.
+     * This changes engraving only. The generated rhythms and pitches
+     * are untouched.
      */
+    let p=0;
+    let eighthPos=0;
+    const events=[];
+
+    const addEvent=(duration)=>{
+        const note=pitches[p++];
+        events.push({
+            abc: abcPitch(note) + String(duration),
+            duration: duration,
+            start: eighthPos
+        });
+        eighthPos += duration;
+    };
+
     for(const token of tokens){
-
         if(token==="E"){
-
-            out.push(
-                abcPitch(pitches[p++]) + "1"
-            );
-
+            addEvent(1);
         }else if(token==="EE"){
-
-            out.push(
-                abcPitch(pitches[p++]) + "1"
-            );
-            out.push(
-                abcPitch(pitches[p++]) + "1"
-            );
-
+            addEvent(1);
+            addEvent(1);
         }else if(token==="EEEE"){
-
-            for(let j=0;j<4;j++){
-
-                out.push(
-                    abcPitch(pitches[p++]) + "1"
-                );
-            }
-
+            addEvent(1);
+            addEvent(1);
+            addEvent(1);
+            addEvent(1);
+        }else if(token==="Q"){
+            addEvent(2);
+        }else if(token==="Q."){
+            addEvent(3);
         }else{
-
-            out.push(
-                abcPitch(pitches[p++]) +
-                abcRhythm(token)
-            );
+            throw Error("Unknown rhythm token: "+token);
         }
     }
 
-    return out.join(" ");
+    if(eighthPos!==8){
+        throw Error(
+            `Measure ${index+1}: rhythm occupies ${eighthPos}/8 instead of 8/8`
+        );
+    }
+
+    let out="";
+
+    events.forEach((event,i)=>{
+        if(i>0){
+            const prev=events[i-1];
+            const beamTogether=
+                prev.duration===1 &&
+                event.duration===1 &&
+                prev.start+1===event.start &&
+                Math.floor(prev.start/2)===Math.floor(event.start/2);
+
+            // No space = beam the two eighth notes in ABC.
+            // Space = start a new rhythmic/beam group.
+            out += beamTogether ? "" : " ";
+        }
+
+        out += event.abc;
+    });
+
+    return out;
 }
 
 
