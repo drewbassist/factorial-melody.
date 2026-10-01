@@ -754,18 +754,22 @@ function renderScore(){
 
 
         /*
-         * Make the internal staff very wide so ABCJS has no reason
-         * to wrap the four measures.
-         *
-         * The resulting SVG is then scaled down to the browser width.
+         * Render each independent four-measure system at its real
+         * display width.  Because each group contains only four bars
+         * on one ABC music line, ABCJS keeps the intended 4-bar system
+         * without requiring a gigantic SVG that must be scaled down.
          */
         const browserWidth=
             container.clientWidth || 1200;
 
+        // Engrave each four-measure system at the width it will actually
+        // occupy on screen.  The old code rendered at 4800+ px and then
+        // shrank the finished SVG with CSS, which made the notation
+        // effectively disappear.
         const staffWidth=
             Math.max(
-                4800,
-                Math.round(browserWidth*4.25)
+                760,
+                Math.round(browserWidth - 48)
             );
 
 
