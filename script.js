@@ -910,23 +910,46 @@ function renderScore(){
             const vb=svg && svg.viewBox && svg.viewBox.baseVal;
             const svgWidth=vb && vb.width ? vb.width : staffWidth;
             const svgHeight=vb && vb.height ? vb.height : 160;
-            const leftPad=92;
-            const usableWidth=Math.max(1,svgWidth-leftPad-24);
-            const barWidth=usableWidth/4;
-            // Place numbers in the conventional lead-sheet position:
-            // just above the staff and below the chord symbol.
-            const numberTop=Math.round(svgHeight*0.62);
-
-            system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
-                el.textContent=String(first+index+2);
+            // Hide ABCJS's own bar-number labels and place one uniform number
+            // at the lower-left of each actual measure. Positioning is derived
+            // from the rendered barlines, so it does not drift across the system.
+            system.querySelectorAll(".abcjs-bar-number").forEach(el=>{
                 el.style.display="none";
             });
+
+            const barlines=[...system.querySelectorAll(".abcjs-bar")].map(el=>{
+                try{
+                    const box=el.getBBox();
+                    return {x:box.x,y:box.y,width:box.width,height:box.height};
+                }catch(e){
+                    return null;
+                }
+            }).filter(Boolean).sort((a,b)=>a.x-b.x);
+
+            // Collapse duplicate barline elements at the same x coordinate.
+            const uniqueBarlines=[];
+            barlines.forEach(box=>{
+                if(!uniqueBarlines.length || Math.abs(box.x-uniqueBarlines[uniqueBarlines.length-1].x)>2){
+                    uniqueBarlines.push(box);
+                }
+            });
+
+            const staffLines=[...system.querySelectorAll(".abcjs-staff")].map(el=>{
+                try{return el.getBBox();}catch(e){return null;}
+            }).filter(Boolean);
+            const staffBottom=staffLines.length
+                ? Math.max(...staffLines.map(box=>box.y+box.height))
+                : svgHeight*0.72;
+            const numberTop=staffBottom+5;
 
             for(let localBar=0;localBar<4;localBar++){
                 const number=document.createElement("div");
                 number.className="fg-uniform-bar-number";
                 number.textContent=String(first+localBar+1);
-                number.style.left=`calc(${leftPad/svgWidth*100}% + ${localBar*(usableWidth/4)/svgWidth*100}%)`;
+
+                const leftBar=uniqueBarlines[localBar];
+                const x=leftBar ? leftBar.x+7 : 92+localBar*((svgWidth-116)/4);
+                number.style.left=`${x/svgWidth*100}%`;
                 number.style.top=`${numberTop}px`;
                 system.appendChild(number);
             }
