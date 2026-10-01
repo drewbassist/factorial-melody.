@@ -947,8 +947,19 @@ function renderScore(){
                 number.className="fg-uniform-bar-number";
                 number.textContent=String(first+localBar+1);
 
-                const leftBar=uniqueBarlines[localBar];
-                const x=leftBar ? leftBar.x+7 : 92+localBar*((svgWidth-116)/4);
+                // ABCJS .abcjs-bar elements are END barlines. Therefore the
+                // left edge of measures 2-4 is the preceding barline, while
+                // measure 1 must be inferred one measure-width before the first
+                // ending barline. This keeps each number assigned to its own bar.
+                let x;
+                if(localBar===0 && uniqueBarlines.length>=2){
+                    const firstMeasureWidth=uniqueBarlines[1].x-uniqueBarlines[0].x;
+                    x=uniqueBarlines[0].x-firstMeasureWidth+7;
+                }else if(localBar>0 && uniqueBarlines[localBar-1]){
+                    x=uniqueBarlines[localBar-1].x+7;
+                }else{
+                    x=92+localBar*((svgWidth-116)/4);
+                }
                 number.style.left=`${x/svgWidth*100}%`;
                 number.style.top=`${numberTop}px`;
                 system.appendChild(number);
