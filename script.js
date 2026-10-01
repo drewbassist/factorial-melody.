@@ -1235,7 +1235,7 @@ function updateDisplayLabels(){
         const text=(el.textContent || "").trim();
 
         if(text==="24 fixed harmonic positions · 24 rhythms · pentatonic pitch generation"){
-            el.textContent="pentatonic and 24 rhythmic generator";
+            el.textContent="pentatonic and 24 rhythmic permutations";
             return;
         }
 
@@ -1246,9 +1246,99 @@ function updateDisplayLabels(){
     });
 }
 
+function modernizeControls(){
+    // UI only: move the five existing buttons into one row without recreating them.
+    // Moving the original DOM nodes preserves their IDs and event handlers.
+    const generate=document.querySelector("#generate");
+    const rhythms=document.querySelector("#rhythms");
+    const pentas=document.querySelector("#pentas");
+    const play=document.querySelector("#playPause");
+    const stop=document.querySelector("#stopPlayback");
+
+    if(!generate || !rhythms || !pentas || !play || !stop) return;
+
+    const playParent=play.parentElement;
+    if(!playParent) return;
+
+    // Keep the existing transport location, but use it as the single control row.
+    playParent.classList.add("fg-control-row");
+    playParent.insertBefore(generate,play);
+    playParent.insertBefore(rhythms,play);
+    playParent.insertBefore(pentas,play);
+
+    [generate,rhythms,pentas,play,stop].forEach(button=>{
+        button.classList.add("fg-modern-button");
+    });
+    generate.classList.add("fg-primary-button");
+    play.classList.add("fg-play-button");
+
+    // Remove any now-empty wrapper that previously held the generator buttons.
+    const candidates=[generate,rhythms,pentas].map(b=>b.parentElement);
+    document.querySelectorAll("body *").forEach(el=>{
+        if(el===playParent || el.children.length!==0) return;
+    });
+
+    if(!document.querySelector("#fg-modern-controls-style")){
+        const style=document.createElement("style");
+        style.id="fg-modern-controls-style";
+        style.textContent=`
+            .fg-control-row{
+                display:flex !important;
+                align-items:center !important;
+                flex-wrap:wrap !important;
+                gap:10px !important;
+                width:100% !important;
+            }
+            .fg-control-row .fg-modern-button{
+                appearance:none;
+                -webkit-appearance:none;
+                min-height:44px !important;
+                padding:0 18px !important;
+                margin:0 !important;
+                border:1px solid #d0d0d0 !important;
+                border-radius:8px !important;
+                background:#fff !important;
+                color:#171717 !important;
+                font:600 14px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+                letter-spacing:.01em !important;
+                box-shadow:0 1px 2px rgba(0,0,0,.04) !important;
+                cursor:pointer !important;
+                transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .05s ease !important;
+                white-space:nowrap !important;
+            }
+            .fg-control-row .fg-modern-button:hover{
+                background:#f7f7f7 !important;
+                border-color:#a9a9a9 !important;
+                box-shadow:0 2px 6px rgba(0,0,0,.07) !important;
+            }
+            .fg-control-row .fg-modern-button:active{
+                transform:translateY(1px) !important;
+                box-shadow:none !important;
+            }
+            .fg-control-row .fg-primary-button,
+            .fg-control-row .fg-play-button{
+                background:#171717 !important;
+                border-color:#171717 !important;
+                color:#fff !important;
+            }
+            .fg-control-row .fg-primary-button:hover,
+            .fg-control-row .fg-play-button:hover{
+                background:#303030 !important;
+                border-color:#303030 !important;
+            }
+            @media (max-width:900px){
+                .fg-control-row{gap:8px !important;}
+                .fg-control-row .fg-modern-button{padding:0 13px !important;font-size:13px !important;}
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 async function initApp(){
 
     updateDisplayLabels();
+    modernizeControls();
 
 /* ============================================================
    EVENT HANDLERS
