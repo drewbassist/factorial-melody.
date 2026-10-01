@@ -1161,11 +1161,20 @@ async function playWithSoundFonts(){
         loadSoundFontInstrument(ctx,accompanimentProgram)
     ]);
 
+    const melodyMaster=ctx.createGain();
+    const accompanimentMaster=ctx.createGain();
+    melodyMaster.gain.value=melodyVolume;
+    accompanimentMaster.gain.value=accompanimentVolume;
+    melodyMaster.connect(ctx.destination);
+    accompanimentMaster.connect(ctx.destination);
+
     audioSynth={
         context:ctx,
         stopped:false,
         sources:[],
         gains:[],
+        melodyMaster,
+        accompanimentMaster,
         timeoutIds:[],
         async pause(){ if(ctx.state==="running") await ctx.suspend(); },
         async resume(){ if(ctx.state==="suspended") await ctx.resume(); },
@@ -1184,7 +1193,7 @@ async function playWithSoundFonts(){
     const barDur=beat*4;
     const startTime=ctx.currentTime+0.08;
 
-    const playSample=(instrument,midi,start,dur,level)=>{
+    const playSample=(instrument,midi,start,dur,level,destination)=>{
         if(audioSynth.stopped) return;
         const found=soundFontBufferForMidi(instrument,midi);
         if(!found) return;
@@ -1200,7 +1209,7 @@ async function playWithSoundFonts(){
         gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
 
         source.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(destination);
         source.start(start);
         source.stop(start+dur+0.02);
         audioSynth.sources.push(source);
@@ -1208,7 +1217,7 @@ async function playWithSoundFonts(){
     };
 
     const playMelodyVoice=(midi,start,dur)=>{
-        playSample(melodyInstrument,midi,start,Math.max(0.08,dur),0.34*melodyVolume);
+        playSample(melodyInstrument,midi,start,Math.max(0.08,dur),0.34,melodyMaster);
     };
 
     const playAccompanimentChord=(chord,start,dur)=>{
@@ -1216,7 +1225,7 @@ async function playWithSoundFonts(){
         const barIndex=Math.max(0,Math.min(B.length-1,Math.round((start-startTime)/barDur)));
         const fixedVoicing=ACCOMP_VOICINGS[barIndex];
         const chordNotes=fixedVoicing || padIntervals(primary).map(interval=>chordRootMidi(primary)+interval);
-        chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105*accompanimentVolume));
+        chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105,accompanimentMaster));
     };
 
     let melodyTime=startTime;
@@ -1444,8 +1453,18 @@ function modernizeControls(){
         playParent.appendChild(wrap);
     };
 
-    makeVolumeControl("melodyVolume","Melody Vol",melodyVolume,value=>{ melodyVolume=value; });
-    makeVolumeControl("accompanimentVolume","Accomp Vol",accompanimentVolume,value=>{ accompanimentVolume=value; });
+    makeVolumeControl("melodyVolume","Melody Vol",melodyVolume,value=>{
+        melodyVolume=value;
+        if(audioSynth?.melodyMaster){
+            audioSynth.melodyMaster.gain.setValueAtTime(value,audioSynth.context.currentTime);
+        }
+    });
+    makeVolumeControl("accompanimentVolume","Accomp Vol",accompanimentVolume,value=>{
+        accompanimentVolume=value;
+        if(audioSynth?.accompanimentMaster){
+            audioSynth.accompanimentMaster.gain.setValueAtTime(value,audioSynth.context.currentTime);
+        }
+    });
 
     // Layout only: place each volume slider directly beneath its sound selector.
     const melodySelectWrap=document.querySelector("#melodySound-wrap");
@@ -1545,6 +1564,13 @@ function modernizeControls(){
                 align-items:flex-start !important;
                 gap:7px !important;
             }
+            .fg-tempo-inline{
+                display:flex !important;
+                align-items:center !important;
+                gap:6px !important;
+                white-space:nowrap !important;
+                margin:0 !important;
+            }
             .fg-sound-control select{
                 min-height:38px !important;
                 padding:0 28px 0 10px !important;
@@ -1622,6 +1648,19 @@ if(tempoControl){
     };
     updateTempoValue();
     tempoControl.addEventListener("input",updateTempoValue);
+
+    // Layout only: move Tempo beside the Accompaniment controls.
+    const tempoLabel=tempoControl.closest("label") || tempoControl.parentElement;
+    const accompanimentStack=document.querySelector(".fg-accompaniment-stack");
+    if(tempoLabel && accompanimentStack && !tempoLabel.classList.contains("fg-tempo-inline")){
+        tempoLabel.classList.add("fg-tempo-inline");
+        accompanimentStack.insertAdjacentElement("afterend",tempoLabel);
+        [...tempoLabel.childNodes].forEach(node=>{
+            if(node.nodeType===Node.TEXT_NODE && node.textContent.trim()==="BPM"){
+                node.textContent="";
+            }
+        });
+    }
 
     tempoControl.addEventListener(
         "change",
