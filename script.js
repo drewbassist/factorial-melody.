@@ -823,8 +823,11 @@ function renderScore(){
                 "L:1/8",
                 ...(group===0 ? [`Q:1/4=${getTempo()}`] : []),
                 "K:C",
+                "%%annotationfont cursive 13",
+                "%%gchordfont cursive 15",
+                "%%measurefont cursive 11",
                 "%%barnumbers 1",
-                "%%measurefirst 1",
+                `%%measurefirst ${first+1}`,
                 "%%barsperstaff 4",
                 "%%stretchlast 1"
             ];
@@ -895,21 +898,6 @@ function renderScore(){
             });
 
 
-            /*
-             * ABCJS starts numbering each independent render at 1.
-             * Change those labels to the actual measure numbers.
-             */
-            const numbers=
-                system.querySelectorAll(
-                    ".abcjs-bar-number"
-                );
-
-            numbers.forEach((el,index)=>{
-
-                el.textContent=
-                    String(first+index+1);
-
-            });
         }
 
     }catch(err){
@@ -1034,6 +1022,26 @@ function midiToFrequency(midi){
     return 440*Math.pow(2,(midi-69)/12);
 }
 
+
+function chordRootMidi(chord){
+    const root=(chord.match(/^([A-G](?:#|b)?)/)||[])[1];
+    if(!root || PC[root]===undefined) return 48;
+    let midi=36+PC[root];
+    while(midi<40) midi+=12;
+    while(midi>51) midi-=12;
+    return midi;
+}
+
+function padIntervals(chord){
+    if(/dim/i.test(chord)) return [0,3,6,9];
+    if(/mM7/i.test(chord)) return [0,3,7,11];
+    if(/m7b5/i.test(chord)) return [0,3,6,10];
+    if(/m7/i.test(chord)) return [0,3,7,10];
+    if(/M7/.test(chord)) return [0,4,7,11];
+    if(/7/.test(chord)) return [0,4,7,10];
+    return [0,4,7];
+}
+
 function playWithWebAudio(){
     const Ctx=window.AudioContext || window.webkitAudioContext;
     if(!Ctx) throw Error("Web Audio is unavailable in this browser");
@@ -1082,7 +1090,29 @@ function playWithWebAudio(){
         audioSynth.gains.push(gain);
     };
 
+    const playPad=(chord,start,dur)=>{
+        const root=chordRootMidi(chord);
+        padIntervals(chord).forEach((interval,voice)=>{
+            const osc=ctx.createOscillator();
+            const gain=ctx.createGain();
+            osc.type=voice%2===0 ? "sine" : "triangle";
+            osc.frequency.value=midiToFrequency(root+interval);
+            gain.gain.setValueAtTime(0.0001,start);
+            gain.gain.linearRampToValueAtTime(0.022,start+Math.min(0.12,dur*0.08));
+            gain.gain.setValueAtTime(0.022,Math.max(start+0.13,start+dur-0.18));
+            gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start+dur+0.02);
+            audioSynth.oscillators.push(osc);
+            audioSynth.gains.push(gain);
+        });
+    };
+
     for(let i=0;i<B.length;i++){
+        const barStart=t;
+        playPad(B[i][0],barStart,beat*4);
         const tokens=rhythmTokens(ro[i][1]);
         if(i===5 || i===20){
             t += beat*4;
@@ -1143,27 +1173,9 @@ async function playPause(){
         audioLoading=true;
         setTransportState("loading");
 
-        // Prefer ABCJS's synth when available, but always have a native browser fallback.
-        if(window.ABCJS && ABCJS.synth && ABCJS.synth.CreateSynth){
-            const visualObj=makePlaybackVisual();
-            const bpm=getTempo();
-            const millisecondsPerMeasure=(60000/bpm)*4;
-            audioSynth=new ABCJS.synth.CreateSynth();
-            await audioSynth.init({
-                visualObj:visualObj,
-                millisecondsPerMeasure:millisecondsPerMeasure,
-                options:{program:0},
-                onEnded:()=>{
-                    audioSynth=null;
-                    audioLoading=false;
-                    setTransportState("stopped");
-                }
-            });
-            await audioSynth.prime();
-            audioSynth.start();
-        }else{
-            playWithWebAudio();
-        }
+        // Native Web Audio keeps the generated melody intact and adds a quiet
+        // sustained whole-measure pad behind each harmonic position.
+        playWithWebAudio();
         setTransportState("playing");
     }catch(error){
         console.error("Playback error:",error);
