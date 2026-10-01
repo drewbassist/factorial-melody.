@@ -618,6 +618,15 @@ function renderScore(){
          */
         const scoreWrap=document.createElement("div");
         scoreWrap.className="score-systems";
+        // Force the six systems into a single vertical column.
+        // This deliberately overrides any inherited flex/grid layout from the page.
+        scoreWrap.style.display="flex";
+        scoreWrap.style.flexDirection="column";
+        scoreWrap.style.flexWrap="nowrap";
+        scoreWrap.style.alignItems="stretch";
+        scoreWrap.style.width="100%";
+        scoreWrap.style.maxWidth="100%";
+        scoreWrap.style.clear="both";
         container.appendChild(scoreWrap);
 
         const availableWidth=Math.max(900, Math.min(1500, container.clientWidth || 1400));
@@ -629,6 +638,14 @@ function renderScore(){
             const system=document.createElement("div");
             system.className="score-system";
             system.dataset.measures=`${first+1}-${last}`;
+            system.style.display="block";
+            system.style.flex="0 0 auto";
+            system.style.width="100%";
+            system.style.maxWidth="100%";
+            system.style.minWidth="0";
+            system.style.overflowX="auto";
+            system.style.clear="both";
+            system.style.marginBottom="18px";
             scoreWrap.appendChild(system);
 
             const abc=[
@@ -661,7 +678,15 @@ function renderScore(){
                 system,
                 abc.join("\n"),
                 {
-                    staffwidth:availableWidth-40,
+                    /*
+                     * IMPORTANT:
+                     * Each system is rendered from exactly four measures.
+                     * Give ABCJS enough horizontal staff width that those
+                     * four measures cannot wrap onto a second line.
+                     */
+                    // Four measures must occupy one complete system.
+                    // Use the actual score width, not an oversized 1400px staff.
+                    staffwidth:Math.max(900, availableWidth-40),
                     scale:1.05,
                     add_classes:true,
                     oneSvgPerLine:true,
@@ -677,6 +702,15 @@ function renderScore(){
             const numbers=system.querySelectorAll(".abcjs-bar-number");
             numbers.forEach((el,index)=>{
                 el.textContent=String(first+index+1);
+            });
+
+            // Make the rendered SVG a block-level object occupying this system only.
+            // This prevents browser/CSS layout from placing subsequent systems beside it.
+            system.querySelectorAll("svg").forEach(svg=>{
+                svg.style.display="block";
+                svg.style.width="100%";
+                svg.style.height="auto";
+                svg.style.maxWidth="none";
             });
         }
     }catch(err){
