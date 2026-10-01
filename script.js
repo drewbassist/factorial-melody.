@@ -1190,6 +1190,8 @@ async function changeTempo(){
 }
 
 
+async function initApp(){
+
 /* ============================================================
    EVENT HANDLERS
    ============================================================ */
@@ -1337,4 +1339,20 @@ if(pentasButton){
    INITIAL GENERATION
    ============================================================ */
 
-generateAll();
+
+    generateAll();
+
+}
+
+/*
+ * The script may be loaded in <head> before the page elements exist.
+ * Waiting for DOMContentLoaded is essential: otherwise every querySelector
+ * below returns null, no button handlers are attached, and the initial
+ * generation never renders.
+ */
+
+if(document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp, { once:true });
+} else {
+    initApp();
+}
