@@ -1447,6 +1447,24 @@ function modernizeControls(){
     makeVolumeControl("melodyVolume","Melody Vol",melodyVolume,value=>{ melodyVolume=value; });
     makeVolumeControl("accompanimentVolume","Accomp Vol",accompanimentVolume,value=>{ accompanimentVolume=value; });
 
+    // Layout only: place each volume slider directly beneath its sound selector.
+    const melodySelectWrap=document.querySelector("#melodySound-wrap");
+    const accompanimentSelectWrap=document.querySelector("#accompanimentSound-wrap");
+    const melodyVolumeWrap=document.querySelector("#melodyVolume-wrap");
+    const accompanimentVolumeWrap=document.querySelector("#accompanimentVolume-wrap");
+
+    const stackControl=(selectWrap,volumeWrap,className)=>{
+        if(!selectWrap || !volumeWrap || selectWrap.parentElement?.classList.contains(className)) return;
+        const stack=document.createElement("div");
+        stack.className="fg-sound-stack "+className;
+        selectWrap.parentNode.insertBefore(stack,selectWrap);
+        stack.appendChild(selectWrap);
+        stack.appendChild(volumeWrap);
+    };
+
+    stackControl(melodySelectWrap,melodyVolumeWrap,"fg-melody-stack");
+    stackControl(accompanimentSelectWrap,accompanimentVolumeWrap,"fg-accompaniment-stack");
+
     // Remove any now-empty wrapper that previously held the generator buttons.
     const candidates=[generate,rhythms,pentas].map(b=>b.parentElement);
     document.querySelectorAll("body *").forEach(el=>{
@@ -1521,6 +1539,12 @@ function modernizeControls(){
                 width:90px !important;
                 cursor:pointer !important;
             }
+            .fg-sound-stack{
+                display:flex !important;
+                flex-direction:column !important;
+                align-items:flex-start !important;
+                gap:7px !important;
+            }
             .fg-sound-control select{
                 min-height:38px !important;
                 padding:0 28px 0 10px !important;
@@ -1583,6 +1607,21 @@ if(tempoControl){
     tempoControl.max="240";
     tempoControl.step="1";
     tempoControl.setAttribute("aria-label","Tempo");
+
+    // Display the current numeric BPM beside the existing tempo slider.
+    let tempoValue=document.querySelector("#tempo-value");
+    if(!tempoValue){
+        tempoValue=document.createElement("span");
+        tempoValue.id="tempo-value";
+        tempoValue.style.marginLeft="8px";
+        tempoValue.style.fontWeight="600";
+        tempoControl.insertAdjacentElement("afterend",tempoValue);
+    }
+    const updateTempoValue=()=>{
+        tempoValue.textContent=String(getTempo())+" BPM";
+    };
+    updateTempoValue();
+    tempoControl.addEventListener("input",updateTempoValue);
 
     tempoControl.addEventListener(
         "change",
