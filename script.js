@@ -894,6 +894,13 @@ function renderScore(){
 
             });
 
+            // Each four-bar system is rendered as an independent ABC tune, so
+            // ABCJS labels its internal barlines 2, 3, 4. Renumber those three
+            // visible labels to the real positions in the 24-bar form.
+            system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
+                el.textContent=String(first+index+2);
+            });
+
 
         }
 
@@ -1094,8 +1101,8 @@ function playWithWebAudio(){
         audioSynth.gains.push(master);
     };
 
-    // Sustained synth pad: one chord for the entire bar, soft attack/release.
-    const playPadChord=(chord,start,dur)=>{
+    // Accompaniment: one soft piano-like chord attack at the start of each bar.
+    const playPianoChord=(chord,start,dur)=>{
         const primary=String(chord).trim().split(/\s{2,}/)[0];
         const root=chordRootMidi(primary);
         padIntervals(primary).forEach((interval,idx)=>{
@@ -1104,11 +1111,11 @@ function playWithWebAudio(){
             osc.type=idx%2 ? "sine" : "triangle";
             osc.frequency.value=midiToFrequency(root+interval);
             gain.gain.setValueAtTime(0.0001,start);
-            gain.gain.linearRampToValueAtTime(0.018,start+Math.min(0.12,dur*0.08));
-            gain.gain.setValueAtTime(0.018,Math.max(start+0.13,start+dur-0.18));
-            gain.gain.linearRampToValueAtTime(0.0001,start+dur);
+            gain.gain.exponentialRampToValueAtTime(0.035,start+0.008);
+            gain.gain.exponentialRampToValueAtTime(0.012,start+Math.min(0.22,dur*0.18));
+            gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.15));
             osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(start); osc.stop(start+dur+0.02);
+            osc.start(start); osc.stop(start+Math.min(dur,1.2));
             audioSynth.oscillators.push(osc);
             audioSynth.gains.push(gain);
         });
@@ -1117,7 +1124,7 @@ function playWithWebAudio(){
     let melodyTime=startTime;
     for(let i=0;i<B.length;i++){
         const barStart=startTime+i*barDur;
-        playPadChord(B[i][0],barStart,barDur*0.98);
+        playPianoChord(B[i][0],barStart,barDur);
 
         const tokens=rhythmTokens(ro[i][1]);
         if(i===5 || i===20){
@@ -1181,7 +1188,7 @@ async function playPause(){
         setTransportState("loading");
 
         // Use the custom Web Audio engine so the generated melody has a Rhodes-like
-        // timbre and the harmony is a sustained whole-note pad.
+        // timbre and the harmony is a single piano-like chord per measure.
         playWithWebAudio();
         setTransportState("playing");
     }catch(error){
