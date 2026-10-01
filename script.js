@@ -696,10 +696,7 @@ function renderScore(){
     try{
 
         if(!window.ABCJS || typeof ABCJS.renderAbc!=="function"){
-
-            throw Error(
-                "ABCJS notation library is not loaded"
-            );
+            return;
         }
 
         /*
@@ -1015,138 +1012,151 @@ function makePlaybackVisual(){
 }
 
 
-async function playPause(){
+function midiToFrequency(midi){
+    return 440*Math.pow(2,(midi-69)/12);
+}
 
-    if(
-        !window.ABCJS ||
-        !ABCJS.synth ||
-        !ABCJS.synth.CreateSynth
-    ){
+function playWithWebAudio(){
+    const Ctx=window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) throw Error("Web Audio is unavailable in this browser");
 
-        const status=
-            document.querySelector(
-                "#transport-status"
-            );
-
-        if(status){
-            status.textContent=
-                "Audio library unavailable";
+    const ctx=audioSynth && audioSynth.context ? audioSynth.context : new Ctx();
+    audioSynth={
+        context:ctx,
+        stopped:false,
+        oscillators:[],
+        gains:[],
+        timeoutIds:[],
+        stop(){
+            this.stopped=true;
+            this.timeoutIds.forEach(clearTimeout);
+            this.oscillators.forEach(o=>{try{o.stop();}catch(e){}});
+            this.oscillators=[];
+            this.gains=[];
         }
+    };
 
-        return;
+    const bpm=getTempo();
+    const beat=60/bpm;
+    let t=ctx.currentTime+0.08;
+
+    const durationForToken=token=>{
+        if(token==="E") return beat/2;
+        if(token==="Q") return beat;
+        if(token==="Q.") return beat*1.5;
+        return 0;
+    };
+
+    const playNote=(midi,start,dur)=>{
+        if(audioSynth.stopped) return;
+        const osc=ctx.createOscillator();
+        const gain=ctx.createGain();
+        osc.type="triangle";
+        osc.frequency.value=midiToFrequency(midi);
+        gain.gain.setValueAtTime(0.0001,start);
+        gain.gain.exponentialRampToValueAtTime(0.16,start+0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.02,start+dur-0.015));
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start+dur);
+        audioSynth.oscillators.push(osc);
+        audioSynth.gains.push(gain);
+    };
+
+    for(let i=0;i<B.length;i++){
+        const tokens=rhythmTokens(ro[i][1]);
+        if(i===5 || i===20){
+            t += beat*4;
+            continue;
+        }
+        let p=0;
+        for(const token of tokens){
+            if(token==="EE"){
+                for(let k=0;k<2;k++){
+                    const n=notes[i][p++];
+                    playNote(n.m,t,beat/2); t+=beat/2;
+                }
+            }else if(token==="EEEE"){
+                for(let k=0;k<4;k++){
+                    const n=notes[i][p++];
+                    playNote(n.m,t,beat/2); t+=beat/2;
+                }
+            }else{
+                const n=notes[i][p++];
+                const d=durationForToken(token);
+                playNote(n.m,t,d); t+=d;
+            }
+        }
     }
 
+    const totalMs=Math.max(0,(t-ctx.currentTime)*1000+100);
+    audioSynth.timeoutIds.push(setTimeout(()=>{
+        if(audioSynth && !audioSynth.stopped){
+            audioSynth=null;
+            setTransportState("stopped");
+        }
+    },totalMs));
+    return audioSynth;
+}
 
+async function playPause(){
     if(audioState==="playing"){
-
         if(audioSynth){
-
-            audioSynth.pause();
-
+            if(typeof audioSynth.pause==="function") audioSynth.pause();
+            else if(audioSynth.context && audioSynth.context.state==="running") await audioSynth.context.suspend();
             setTransportState("paused");
         }
-
         return;
     }
-
 
     if(audioState==="paused"){
-
         if(audioSynth){
-
-            audioSynth.resume();
-
+            if(typeof audioSynth.resume==="function") audioSynth.resume();
+            else if(audioSynth.context && audioSynth.context.state==="suspended") await audioSynth.context.resume();
             setTransportState("playing");
         }
-
         return;
     }
 
-
-    if(audioLoading){
-        return;
-    }
-
+    if(audioLoading) return;
 
     try{
-
         audioLoading=true;
-
         setTransportState("loading");
 
-
-        /*
-         * This happens inside the actual Play click.
-         * That is important for browser audio permissions.
-         */
-        const visualObj=
-            makePlaybackVisual();
-
-        const bpm=getTempo();
-
-        const millisecondsPerMeasure=
-            (60000/bpm)*4;
-
-
-        audioSynth=
-            new ABCJS.synth.CreateSynth();
-
-
-        await audioSynth.init({
-
-            visualObj:visualObj,
-
-            millisecondsPerMeasure:
-                millisecondsPerMeasure,
-
-            options:{
-                program:0
-            },
-
-            onEnded:()=>{
-
-                audioSynth=null;
-                audioLoading=false;
-
-                setTransportState(
-                    "stopped"
-                );
-            }
-        });
-
-
-        await audioSynth.prime();
-
-        audioSynth.start();
-
-        setTransportState("playing");
-
-
-    }catch(error){
-
-        console.error(
-            "Playback error:",
-            error
-        );
-
-        audioSynth=null;
-
-        setTransportState("stopped");
-
-
-        const status=
-            document.querySelector(
-                "#transport-status"
-            );
-
-        if(status){
-
-            status.textContent=
-                "Audio error — click Play again";
+        // Prefer ABCJS's synth when available, but always have a native browser fallback.
+        if(window.ABCJS && ABCJS.synth && ABCJS.synth.CreateSynth){
+            const visualObj=makePlaybackVisual();
+            const bpm=getTempo();
+            const millisecondsPerMeasure=(60000/bpm)*4;
+            audioSynth=new ABCJS.synth.CreateSynth();
+            await audioSynth.init({
+                visualObj:visualObj,
+                millisecondsPerMeasure:millisecondsPerMeasure,
+                options:{program:0},
+                onEnded:()=>{
+                    audioSynth=null;
+                    audioLoading=false;
+                    setTransportState("stopped");
+                }
+            });
+            await audioSynth.prime();
+            audioSynth.start();
+        }else{
+            playWithWebAudio();
         }
-
+        setTransportState("playing");
+    }catch(error){
+        console.error("Playback error:",error);
+        if(audioSynth && typeof audioSynth.stop==="function"){
+            try{audioSynth.stop();}catch(e){}
+        }
+        audioSynth=null;
+        setTransportState("stopped");
+        const status=document.querySelector("#transport-status");
+        if(status) status.textContent="Audio error — click Play again";
     }finally{
-
         audioLoading=false;
     }
 }
@@ -1345,14 +1355,30 @@ if(pentasButton){
 }
 
 /*
- * The script may be loaded in <head> before the page elements exist.
- * Waiting for DOMContentLoaded is essential: otherwise every querySelector
- * below returns null, no button handlers are attached, and the initial
- * generation never renders.
+ * Boot only after BOTH the DOM and ABCJS are available.  The previous
+ * version could initialize before ABCJS had loaded, leaving the score blank
+ * and making the transport unusable.  We do not change the generator data.
  */
+function boot(){
+    if(document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot, { once:true });
+        return;
+    }
 
-if(document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initApp, { once:true });
-} else {
     initApp();
+
+    // If ABCJS is loaded asynchronously, render again as soon as it appears.
+    if(!window.ABCJS || typeof ABCJS.renderAbc !== "function") {
+        let tries=0;
+        const timer=setInterval(()=>{
+            tries++;
+            if(window.ABCJS && typeof ABCJS.renderAbc === "function") {
+                clearInterval(timer);
+                try { renderScore(); } catch(e) { console.error(e); }
+            }
+            if(tries>100) clearInterval(timer);
+        },100);
+    }
 }
+
+boot();
