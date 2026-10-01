@@ -903,20 +903,31 @@ function renderScore(){
 
             });
 
-            // Each four-bar system is rendered as an independent ABC tune, so
-            // ABCJS labels its internal barlines 2, 3, 4. Renumber those three
-            // visible labels to the real positions in the 24-bar form.
+            // Normalize every bar number to the same low-left position and size.
+            // ABCJS supplies bars 2-4 of each system; position those labels
+            // consistently, then add the missing first number in the same style.
+            const svg=system.querySelector("svg");
+            const vb=svg && svg.viewBox && svg.viewBox.baseVal;
+            const svgWidth=vb && vb.width ? vb.width : staffWidth;
+            const svgHeight=vb && vb.height ? vb.height : 160;
+            const leftPad=92;
+            const usableWidth=Math.max(1,svgWidth-leftPad-24);
+            const barWidth=usableWidth/4;
+            const numberTop=Math.round(svgHeight*0.58);
+
             system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
                 el.textContent=String(first+index+2);
+                el.style.display="none";
             });
 
-            // ABCJS does not draw a number over the first measure of an
-            // independently rendered system. Add that missing number so all
-            // measures 1-24 are visibly numbered.
-            const firstBarNumber=document.createElement("div");
-            firstBarNumber.className="fg-first-bar-number";
-            firstBarNumber.textContent=String(first+1);
-            system.appendChild(firstBarNumber);
+            for(let localBar=0;localBar<4;localBar++){
+                const number=document.createElement("div");
+                number.className="fg-uniform-bar-number";
+                number.textContent=String(first+localBar+1);
+                number.style.left=`calc(${leftPad/svgWidth*100}% + ${localBar*(usableWidth/4)/svgWidth*100}%)`;
+                number.style.top=`${numberTop}px`;
+                system.appendChild(number);
+            }
 
 
         }
@@ -1528,11 +1539,10 @@ function modernizeControls(){
                 row-gap:10px !important;
                 width:100% !important;
             }
-            .fg-first-bar-number{
+            .fg-uniform-bar-number{
                 position:absolute;
-                left:92px;
-                top:43px;
                 z-index:2;
+                transform:translateX(4px);
                 font:italic 13px/1 Georgia,"Times New Roman",serif;
                 color:#171717;
                 pointer-events:none;
