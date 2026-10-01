@@ -1061,15 +1061,108 @@ const ACCOMP_VOICINGS=[
     [53,57,60,62], [53,56,58,62], [53,57,58,62], [55,58,62,63]
 ];
 
-function playWithWebAudio(){
+const SOUNDFONT_BASE="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+const SOUNDFONT_PROGRAMS={
+    "rhodes":"electric_piano_1",
+    "vibraphone":"vibraphone",
+    "warm-synth":"synth_strings_1",
+    "piano":"acoustic_grand_piano",
+    "pad":"synth_strings_1"
+};
+const soundFontCache=new Map();
+const soundFontScriptCache=new Map();
+
+function midiNoteName(midi){
+    const names=["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+    return names[midi%12]+(Math.floor(midi/12)-1);
+}
+
+function loadSoundFontScript(program){
+    if(window.MIDI && MIDI.Soundfont && MIDI.Soundfont[program]){
+        return Promise.resolve(MIDI.Soundfont[program]);
+    }
+    if(soundFontScriptCache.has(program)) return soundFontScriptCache.get(program);
+
+    const promise=new Promise((resolve,reject)=>{
+        window.MIDI=window.MIDI || {};
+        MIDI.Soundfont=MIDI.Soundfont || {};
+
+        const script=document.createElement("script");
+        script.src=SOUNDFONT_BASE+program+"-mp3.js";
+        script.async=true;
+        script.onload=()=>{
+            const data=MIDI.Soundfont && MIDI.Soundfont[program];
+            if(data) resolve(data);
+            else reject(Error("SoundFont loaded without instrument data: "+program));
+        };
+        script.onerror=()=>reject(Error("Could not load SoundFont: "+program));
+        document.head.appendChild(script);
+    });
+
+    soundFontScriptCache.set(program,promise);
+    return promise;
+}
+
+function decodeSoundFontSample(ctx,dataUri){
+    const comma=dataUri.indexOf(",");
+    const raw=atob(dataUri.slice(comma+1));
+    const bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
+    return ctx.decodeAudioData(bytes.buffer);
+}
+
+async function loadSoundFontInstrument(ctx,program){
+    const key=program+"@"+ctx.sampleRate;
+    if(soundFontCache.has(key)) return soundFontCache.get(key);
+
+    const promise=(async()=>{
+        const encoded=await loadSoundFontScript(program);
+        const decoded={};
+        await Promise.all(Object.entries(encoded).map(async([note,dataUri])=>{
+            try{ decoded[note]=await decodeSoundFontSample(ctx,dataUri); }
+            catch(e){ console.warn("SoundFont sample decode failed:",program,note,e); }
+        }));
+        return decoded;
+    })();
+
+    soundFontCache.set(key,promise);
+    return promise;
+}
+
+function soundFontBufferForMidi(instrument,midi){
+    const exact=midiNoteName(midi);
+    if(instrument[exact]) return {buffer:instrument[exact],rate:1};
+
+    let best=null;
+    for(let distance=1;distance<=12 && !best;distance++){
+        for(const candidate of [midi-distance,midi+distance]){
+            const name=midiNoteName(candidate);
+            if(instrument[name]){
+                best={buffer:instrument[name],rate:Math.pow(2,(midi-candidate)/12)};
+                break;
+            }
+        }
+    }
+    return best;
+}
+
+async function playWithSoundFonts(){
     const Ctx=window.AudioContext || window.webkitAudioContext;
     if(!Ctx) throw Error("Web Audio is unavailable in this browser");
 
     const ctx=new Ctx();
+    const melodyProgram=SOUNDFONT_PROGRAMS[melodySound] || "electric_piano_1";
+    const accompanimentProgram=SOUNDFONT_PROGRAMS[accompanimentSound] || "acoustic_grand_piano";
+
+    const [melodyInstrument,accompanimentInstrument]=await Promise.all([
+        loadSoundFontInstrument(ctx,melodyProgram),
+        loadSoundFontInstrument(ctx,accompanimentProgram)
+    ]);
+
     audioSynth={
         context:ctx,
         stopped:false,
-        oscillators:[],
+        sources:[],
         gains:[],
         timeoutIds:[],
         async pause(){ if(ctx.state==="running") await ctx.suspend(); },
@@ -1077,8 +1170,8 @@ function playWithWebAudio(){
         stop(){
             this.stopped=true;
             this.timeoutIds.forEach(clearTimeout);
-            this.oscillators.forEach(o=>{try{o.stop();}catch(e){}});
-            this.oscillators=[];
+            this.sources.forEach(source=>{try{source.stop();}catch(e){}});
+            this.sources=[];
             this.gains=[];
             try{ctx.close();}catch(e){}
         }
@@ -1089,86 +1182,39 @@ function playWithWebAudio(){
     const barDur=beat*4;
     const startTime=ctx.currentTime+0.08;
 
-    // Selectable Web Audio melody voices.
-    const playMelodyVoice=(midi,start,dur)=>{
+    const playSample=(instrument,midi,start,dur,level)=>{
         if(audioSynth.stopped) return;
-        const sound=melodySound;
-        const master=ctx.createGain();
-        master.gain.setValueAtTime(0.0001,start);
+        const found=soundFontBufferForMidi(instrument,midi);
+        if(!found) return;
 
-        if(sound==="vibraphone"){
-            master.gain.exponentialRampToValueAtTime(0.11,start+0.006);
-            master.gain.exponentialRampToValueAtTime(0.0001,start+Math.max(0.16,dur));
-        }else if(sound==="warm-synth"){
-            master.gain.exponentialRampToValueAtTime(0.10,start+0.025);
-            master.gain.exponentialRampToValueAtTime(0.06,start+Math.min(0.18,dur*0.35));
-            master.gain.exponentialRampToValueAtTime(0.0001,start+Math.max(0.12,dur));
-        }else{
-            master.gain.exponentialRampToValueAtTime(0.13,start+0.012);
-            master.gain.exponentialRampToValueAtTime(0.055,start+Math.min(0.16,dur*0.35));
-            master.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.04,start+dur-0.015));
-        }
-        master.connect(ctx.destination);
+        const source=ctx.createBufferSource();
+        const gain=ctx.createGain();
+        source.buffer=found.buffer;
+        source.playbackRate.setValueAtTime(found.rate,start);
 
-        const partials = sound==="vibraphone"
-            ? [["sine",1,1.0],["sine",3,0.12]]
-            : sound==="warm-synth"
-                ? [["sawtooth",1,0.42],["triangle",1,0.58]]
-                : [["sine",1,1.0],["triangle",2,0.16]];
+        gain.gain.setValueAtTime(0.0001,start);
+        gain.gain.exponentialRampToValueAtTime(level,start+0.006);
+        gain.gain.setValueAtTime(level,start+Math.max(0.01,dur-0.035));
+        gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
 
-        partials.forEach(([type,mult,level])=>{
-            const osc=ctx.createOscillator();
-            const g=ctx.createGain();
-            osc.type=type;
-            osc.frequency.value=midiToFrequency(midi)*mult;
-            g.gain.value=level;
-            osc.connect(g); g.connect(master);
-            osc.start(start); osc.stop(start+Math.max(0.08,dur));
-            audioSynth.oscillators.push(osc);
-            audioSynth.gains.push(g);
-        });
-        audioSynth.gains.push(master);
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(start);
+        source.stop(start+dur+0.02);
+        audioSynth.sources.push(source);
+        audioSynth.gains.push(gain);
     };
 
-    // Selectable accompaniment voices. Each remains one chord attack per measure.
+    const playMelodyVoice=(midi,start,dur)=>{
+        playSample(melodyInstrument,midi,start,Math.max(0.08,dur),0.34);
+    };
+
     const playAccompanimentChord=(chord,start,dur)=>{
         const primary=String(chord).trim().split(/\s{2,}/)[0];
-        const sound=accompanimentSound;
         const barIndex=Math.max(0,Math.min(B.length-1,Math.round((start-startTime)/barDur)));
         const fixedVoicing=ACCOMP_VOICINGS[barIndex];
         const chordNotes=fixedVoicing || padIntervals(primary).map(interval=>chordRootMidi(primary)+interval);
-
-        chordNotes.forEach((midi,idx)=>{
-            const osc=ctx.createOscillator();
-            const gain=ctx.createGain();
-
-            if(sound==="pad"){
-                osc.type=idx%2 ? "sine" : "triangle";
-                gain.gain.setValueAtTime(0.0001,start);
-                gain.gain.exponentialRampToValueAtTime(0.022,start+0.12);
-                gain.gain.setValueAtTime(0.018,start+Math.max(0.13,dur-0.18));
-                gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
-            }else if(sound==="rhodes"){
-                osc.type=idx%2 ? "sine" : "triangle";
-                gain.gain.setValueAtTime(0.0001,start);
-                gain.gain.exponentialRampToValueAtTime(0.03,start+0.012);
-                gain.gain.exponentialRampToValueAtTime(0.009,start+Math.min(0.28,dur*0.25));
-                gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.5));
-            }else{
-                osc.type=idx%2 ? "sine" : "triangle";
-                gain.gain.setValueAtTime(0.0001,start);
-                gain.gain.exponentialRampToValueAtTime(0.035,start+0.008);
-                gain.gain.exponentialRampToValueAtTime(0.012,start+Math.min(0.22,dur*0.18));
-                gain.gain.exponentialRampToValueAtTime(0.0001,start+Math.min(dur,1.15));
-            }
-
-            osc.frequency.value=midiToFrequency(midi);
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(start);
-            osc.stop(start+(sound==="pad" ? dur : Math.min(dur,sound==="rhodes" ? 1.55 : 1.2)));
-            audioSynth.oscillators.push(osc);
-            audioSynth.gains.push(gain);
-        });
+        chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105));
     };
 
     let melodyTime=startTime;
@@ -1237,9 +1283,8 @@ async function playPause(){
         audioLoading=true;
         setTransportState("loading");
 
-        // Use the custom Web Audio engine so the generated melody has a Rhodes-like
-        // timbre and the harmony is a single piano-like chord per measure.
-        playWithWebAudio();
+        // Use sampled SoundFont instruments. Generation, notation, timing and voicings are unchanged.
+        await playWithSoundFonts();
         setTransportState("playing");
     }catch(error){
         console.error("Playback error:",error);
