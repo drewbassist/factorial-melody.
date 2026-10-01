@@ -943,29 +943,13 @@ function renderScore(){
             const numberTop=staffBottom+5;
 
             for(let localBar=0;localBar<4;localBar++){
+                if(localBar!==0) continue;
                 const number=document.createElement("div");
                 number.className="fg-uniform-bar-number";
                 number.textContent=String(first+localBar+1);
 
-                // Put each number directly below the beginning of its bar.
-                // Bars 2-4 begin at the preceding rendered barline. Bar 1 has
-                // no opening barline, so use the end of the clef/time-signature
-                // area as its true musical start instead of estimating a bar width.
-                let x;
-                if(localBar===0){
-                    const openingItems=[
-                        ...system.querySelectorAll(".abcjs-clef, .abcjs-time-signature")
-                    ].map(el=>{
-                        try{return el.getBBox();}catch(e){return null;}
-                    }).filter(Boolean);
-                    x=openingItems.length
-                        ? Math.max(...openingItems.map(box=>box.x+box.width))
-                        : (staffLines.length ? Math.min(...staffLines.map(box=>box.x)) : 92);
-                }else if(uniqueBarlines[localBar-1]){
-                    x=uniqueBarlines[localBar-1].x;
-                }else{
-                    x=92+localBar*((svgWidth-116)/4);
-                }
+                const leftBar=uniqueBarlines[localBar];
+                const x=leftBar ? leftBar.x+7 : 92+localBar*((svgWidth-116)/4);
                 number.style.left=`${x/svgWidth*100}%`;
                 number.style.top=`${numberTop}px`;
                 system.appendChild(number);
@@ -1584,6 +1568,7 @@ function modernizeControls(){
             .fg-uniform-bar-number{
                 position:absolute;
                 z-index:2;
+                transform:translateX(2px);
                 font:italic 13px/1 Georgia,"Times New Roman",serif;
                 color:#171717;
                 pointer-events:none;
