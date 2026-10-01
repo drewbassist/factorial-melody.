@@ -947,16 +947,22 @@ function renderScore(){
                 number.className="fg-uniform-bar-number";
                 number.textContent=String(first+localBar+1);
 
-                // ABCJS .abcjs-bar elements are END barlines. Therefore the
-                // left edge of measures 2-4 is the preceding barline, while
-                // measure 1 must be inferred one measure-width before the first
-                // ending barline. This keeps each number assigned to its own bar.
+                // Put each number directly below the beginning of its bar.
+                // Bars 2-4 begin at the preceding rendered barline. Bar 1 has
+                // no opening barline, so use the end of the clef/time-signature
+                // area as its true musical start instead of estimating a bar width.
                 let x;
-                if(localBar===0 && uniqueBarlines.length>=2){
-                    const firstMeasureWidth=uniqueBarlines[1].x-uniqueBarlines[0].x;
-                    x=uniqueBarlines[0].x-firstMeasureWidth+7;
-                }else if(localBar>0 && uniqueBarlines[localBar-1]){
-                    x=uniqueBarlines[localBar-1].x+7;
+                if(localBar===0){
+                    const openingItems=[
+                        ...system.querySelectorAll(".abcjs-clef, .abcjs-time-signature")
+                    ].map(el=>{
+                        try{return el.getBBox();}catch(e){return null;}
+                    }).filter(Boolean);
+                    x=openingItems.length
+                        ? Math.max(...openingItems.map(box=>box.x+box.width))
+                        : (staffLines.length ? Math.min(...staffLines.map(box=>box.x)) : 92);
+                }else if(uniqueBarlines[localBar-1]){
+                    x=uniqueBarlines[localBar-1].x;
                 }else{
                     x=92+localBar*((svgWidth-116)/4);
                 }
@@ -1578,7 +1584,6 @@ function modernizeControls(){
             .fg-uniform-bar-number{
                 position:absolute;
                 z-index:2;
-                transform:translateX(2px);
                 font:italic 13px/1 Georgia,"Times New Roman",serif;
                 color:#171717;
                 pointer-events:none;
