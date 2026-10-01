@@ -510,7 +510,62 @@ function abcMeasure(index){
         );
     }
 
+    /*
+     * Build one engraving event for every generated attack.
+     *
+     * If two consecutive attacks are the same pitch, they are engraved
+     * as a tied pair rather than as two independently articulated notes.
+     *
+     * This does NOT change the generated attacks, rhythm data, pitch
+     * generation, or playback data. It only restores the visible tie
+     * notation in the score.
+     *
+     * There are deliberately NO cross-barline ties. In particular,
+     * Measures 6 and 21 remain completely independent improvisation bars.
+     */
+    const events = [];
     let p = 0;
+
+    function addEvent(token){
+        let duration;
+
+        if(token === "E") duration = "1";
+        else if(token === "EE") duration = "1";
+        else if(token === "EEEE") duration = "1";
+        else duration = abcRhythm(token);
+
+        events.push({
+            pitch: pitches[p++],
+            duration
+        });
+    }
+
+    for(const token of tokens){
+        if(token === "EE"){
+            addEvent("EE");
+            addEvent("EE");
+        }else if(token === "EEEE"){
+            for(let j=0;j<4;j++) addEvent("EEEE");
+        }else{
+            addEvent(token);
+        }
+    }
+
+    /*
+     * A tie is added only when adjacent attacks are the same pitch.
+     * The second note remains a separate attack in the generated data,
+     * so the table continues to report the original attack count.
+     */
+    for(let i=0;i<events.length-1;i++){
+        if(events[i].pitch.s === events[i+1].pitch.s){
+            events[i].tie = true;
+        }
+    }
+
+    /*
+     * Preserve ABCJS's normal eighth-note beaming while inserting
+     * ties at the exact attack where they belong.
+     */
     const out = [];
     let beam = "";
 
@@ -521,31 +576,16 @@ function abcMeasure(index){
         }
     }
 
-    for(const token of tokens){
+    for(let i=0;i<events.length;i++){
+        const e = events[i];
+        const pitch = abcPitch(e.pitch);
+        const suffix = e.tie ? "-" : "";
 
-        // L:1/8 means an undelimited pitch is an eighth note.
-        // Adjacent eighth notes are therefore automatically beamed by abcjs.
-        if(token === "E"){
-            beam += abcPitch(pitches[p++]);
-        }
-
-        else if(token === "EE"){
-            beam += abcPitch(pitches[p++]);
-            beam += abcPitch(pitches[p++]);
-        }
-
-        else if(token === "EEEE"){
-            for(let j=0;j<4;j++){
-                beam += abcPitch(pitches[p++]);
-            }
-        }
-
-        else{
+        if(e.duration === "1"){
+            beam += pitch + suffix;
+        }else{
             flushBeam();
-            out.push(
-                abcPitch(pitches[p++]) +
-                abcRhythm(token)
-            );
+            out.push(pitch + e.duration + suffix);
         }
     }
 
