@@ -913,7 +913,9 @@ function renderScore(){
             const leftPad=92;
             const usableWidth=Math.max(1,svgWidth-leftPad-24);
             const barWidth=usableWidth/4;
-            const numberTop=Math.round(svgHeight*0.58);
+            // Place numbers in the conventional lead-sheet position:
+            // just above the staff and below the chord symbol.
+            const numberTop=Math.round(svgHeight*0.34);
 
             system.querySelectorAll(".abcjs-bar-number").forEach((el,index)=>{
                 el.textContent=String(first+index+2);
@@ -1542,7 +1544,7 @@ function modernizeControls(){
             .fg-uniform-bar-number{
                 position:absolute;
                 z-index:2;
-                transform:translateX(4px);
+                transform:translateX(2px);
                 font:italic 13px/1 Georgia,"Times New Roman",serif;
                 color:#171717;
                 pointer-events:none;
