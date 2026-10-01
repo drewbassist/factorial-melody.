@@ -227,6 +227,8 @@ let audioLoading=false;
 let audioState="stopped";
 let melodySound="rhodes";
 let accompanimentSound="piano";
+let melodyVolume=1;
+let accompanimentVolume=1;
 
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 
@@ -1206,7 +1208,7 @@ async function playWithSoundFonts(){
     };
 
     const playMelodyVoice=(midi,start,dur)=>{
-        playSample(melodyInstrument,midi,start,Math.max(0.08,dur),0.34);
+        playSample(melodyInstrument,midi,start,Math.max(0.08,dur),0.34*melodyVolume);
     };
 
     const playAccompanimentChord=(chord,start,dur)=>{
@@ -1214,7 +1216,7 @@ async function playWithSoundFonts(){
         const barIndex=Math.max(0,Math.min(B.length-1,Math.round((start-startTime)/barDur)));
         const fixedVoicing=ACCOMP_VOICINGS[barIndex];
         const chordNotes=fixedVoicing || padIntervals(primary).map(interval=>chordRootMidi(primary)+interval);
-        chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105));
+        chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105*accompanimentVolume));
     };
 
     let melodyTime=startTime;
@@ -1422,6 +1424,29 @@ function modernizeControls(){
         ["piano","Piano"],["rhodes","Rhodes"],["pad","Pad"]
     ],accompanimentSound,value=>{ accompanimentSound=value; });
 
+    // Independent playback volume controls only.
+    const makeVolumeControl=(id,label,value,onInput)=>{
+        if(document.querySelector("#"+id+"-wrap")) return;
+        const wrap=document.createElement("label");
+        wrap.id=id+"-wrap";
+        wrap.className="fg-volume-control";
+        wrap.append(document.createTextNode(label+" "));
+        const input=document.createElement("input");
+        input.type="range";
+        input.id=id;
+        input.min="0";
+        input.max="100";
+        input.step="1";
+        input.value=String(Math.round(value*100));
+        input.setAttribute("aria-label",label+" volume");
+        input.addEventListener("input",()=>onInput(Number(input.value)/100));
+        wrap.appendChild(input);
+        playParent.appendChild(wrap);
+    };
+
+    makeVolumeControl("melodyVolume","Melody Vol",melodyVolume,value=>{ melodyVolume=value; });
+    makeVolumeControl("accompanimentVolume","Accomp Vol",accompanimentVolume,value=>{ accompanimentVolume=value; });
+
     // Remove any now-empty wrapper that previously held the generator buttons.
     const candidates=[generate,rhythms,pentas].map(b=>b.parentElement);
     document.querySelectorAll("body *").forEach(el=>{
@@ -1484,6 +1509,18 @@ function modernizeControls(){
                 color:#555 !important;
                 white-space:nowrap !important;
             }
+            .fg-volume-control{
+                display:flex !important;
+                align-items:center !important;
+                gap:6px !important;
+                font:600 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+                color:#555 !important;
+                white-space:nowrap !important;
+            }
+            .fg-volume-control input[type="range"]{
+                width:90px !important;
+                cursor:pointer !important;
+            }
             .fg-sound-control select{
                 min-height:38px !important;
                 padding:0 28px 0 10px !important;
@@ -1539,6 +1576,13 @@ const tempoControl=
     document.querySelector("#tempo");
 
 if(tempoControl){
+
+    // Tempo control only: present the existing 40–240 BPM control as a slider.
+    tempoControl.type="range";
+    tempoControl.min="40";
+    tempoControl.max="240";
+    tempoControl.step="1";
+    tempoControl.setAttribute("aria-label","Tempo");
 
     tempoControl.addEventListener(
         "change",
