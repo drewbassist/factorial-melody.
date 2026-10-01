@@ -823,9 +823,6 @@ function renderScore(){
                 "L:1/8",
                 ...(group===0 ? [`Q:1/4=${getTempo()}`] : []),
                 "K:C",
-                "%%annotationfont cursive 13",
-                "%%gchordfont cursive 15",
-                "%%measurefont cursive 11",
                 "%%barnumbers 1",
                 `%%measurefirst ${first+1}`,
                 "%%barsperstaff 4",
@@ -1022,23 +1019,25 @@ function midiToFrequency(midi){
     return 440*Math.pow(2,(midi-69)/12);
 }
 
-
 function chordRootMidi(chord){
-    const root=(chord.match(/^([A-G](?:#|b)?)/)||[])[1];
-    if(!root || PC[root]===undefined) return 48;
-    let midi=36+PC[root];
-    while(midi<40) midi+=12;
-    while(midi>51) midi-=12;
-    return midi;
+    const m=String(chord).match(/^([A-G])([#b]?)/);
+    if(!m) return 60;
+    const name=m[1]+(m[2]||"");
+    const pc=PC[name];
+    // Pad register is intentionally one octave higher than the previous accompaniment.
+    // Put roots around C4-B4, then build compact voicings above them.
+    return 60+pc;
 }
 
 function padIntervals(chord){
-    if(/dim/i.test(chord)) return [0,3,6,9];
-    if(/mM7/i.test(chord)) return [0,3,7,11];
-    if(/m7b5/i.test(chord)) return [0,3,6,10];
-    if(/m7/i.test(chord)) return [0,3,7,10];
-    if(/M7/.test(chord)) return [0,4,7,11];
-    if(/7/.test(chord)) return [0,4,7,10];
+    const c=String(chord);
+    if(/dim7/i.test(c)) return [0,3,6,9];
+    if(/m7b5/i.test(c)) return [0,3,6,10];
+    if(/mM7/i.test(c)) return [0,3,7,11];
+    if(/M7/.test(c)) return [0,4,7,11];
+    if(/m7/i.test(c)) return [0,3,7,10];
+    if(/7/.test(c)) return [0,4,7,10];
+    if(/m/i.test(c)) return [0,3,7];
     return [0,4,7];
 }
 
@@ -1046,76 +1045,83 @@ function playWithWebAudio(){
     const Ctx=window.AudioContext || window.webkitAudioContext;
     if(!Ctx) throw Error("Web Audio is unavailable in this browser");
 
-    const ctx=audioSynth && audioSynth.context ? audioSynth.context : new Ctx();
+    const ctx=new Ctx();
     audioSynth={
         context:ctx,
         stopped:false,
         oscillators:[],
         gains:[],
         timeoutIds:[],
+        async pause(){ if(ctx.state==="running") await ctx.suspend(); },
+        async resume(){ if(ctx.state==="suspended") await ctx.resume(); },
         stop(){
             this.stopped=true;
             this.timeoutIds.forEach(clearTimeout);
             this.oscillators.forEach(o=>{try{o.stop();}catch(e){}});
             this.oscillators=[];
             this.gains=[];
+            try{ctx.close();}catch(e){}
         }
     };
 
     const bpm=getTempo();
     const beat=60/bpm;
-    let t=ctx.currentTime+0.08;
+    const barDur=beat*4;
+    const startTime=ctx.currentTime+0.08;
 
-    const durationForToken=token=>{
-        if(token==="E") return beat/2;
-        if(token==="Q") return beat;
-        if(token==="Q.") return beat*1.5;
-        return 0;
-    };
-
-    const playNote=(midi,start,dur)=>{
+    // Rhodes-like melody: a soft sine fundamental plus a quieter triangle overtone,
+    // with a quick attack and rounded electric-piano decay.
+    const playRhodes=(midi,start,dur)=>{
         if(audioSynth.stopped) return;
-        const osc=ctx.createOscillator();
-        const gain=ctx.createGain();
-        osc.type="triangle";
-        osc.frequency.value=midiToFrequency(midi);
-        gain.gain.setValueAtTime(0.0001,start);
-        gain.gain.exponentialRampToValueAtTime(0.16,start+0.008);
-        gain.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.02,start+dur-0.015));
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(start);
-        osc.stop(start+dur);
-        audioSynth.oscillators.push(osc);
-        audioSynth.gains.push(gain);
+        const master=ctx.createGain();
+        master.gain.setValueAtTime(0.0001,start);
+        master.gain.exponentialRampToValueAtTime(0.13,start+0.012);
+        master.gain.exponentialRampToValueAtTime(0.055,start+Math.min(0.16,dur*0.35));
+        master.gain.exponentialRampToValueAtTime(0.0001,Math.max(start+0.04,start+dur-0.015));
+        master.connect(ctx.destination);
+
+        [["sine",1,1.0],["triangle",2,0.16]].forEach(([type,mult,level])=>{
+            const osc=ctx.createOscillator();
+            const g=ctx.createGain();
+            osc.type=type;
+            osc.frequency.value=midiToFrequency(midi)*mult;
+            g.gain.value=level;
+            osc.connect(g); g.connect(master);
+            osc.start(start); osc.stop(start+dur);
+            audioSynth.oscillators.push(osc);
+            audioSynth.gains.push(g);
+        });
+        audioSynth.gains.push(master);
     };
 
-    const playPad=(chord,start,dur)=>{
-        const root=chordRootMidi(chord);
-        padIntervals(chord).forEach((interval,voice)=>{
+    // Sustained synth pad: one chord for the entire bar, soft attack/release.
+    const playPadChord=(chord,start,dur)=>{
+        const primary=String(chord).trim().split(/\s{2,}/)[0];
+        const root=chordRootMidi(primary);
+        padIntervals(primary).forEach((interval,idx)=>{
             const osc=ctx.createOscillator();
             const gain=ctx.createGain();
-            osc.type=voice%2===0 ? "sine" : "triangle";
+            osc.type=idx%2 ? "sine" : "triangle";
             osc.frequency.value=midiToFrequency(root+interval);
             gain.gain.setValueAtTime(0.0001,start);
-            gain.gain.linearRampToValueAtTime(0.022,start+Math.min(0.12,dur*0.08));
-            gain.gain.setValueAtTime(0.022,Math.max(start+0.13,start+dur-0.18));
-            gain.gain.exponentialRampToValueAtTime(0.0001,start+dur);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(start);
-            osc.stop(start+dur+0.02);
+            gain.gain.linearRampToValueAtTime(0.018,start+Math.min(0.12,dur*0.08));
+            gain.gain.setValueAtTime(0.018,Math.max(start+0.13,start+dur-0.18));
+            gain.gain.linearRampToValueAtTime(0.0001,start+dur);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(start); osc.stop(start+dur+0.02);
             audioSynth.oscillators.push(osc);
             audioSynth.gains.push(gain);
         });
     };
 
+    let melodyTime=startTime;
     for(let i=0;i<B.length;i++){
-        const barStart=t;
-        playPad(B[i][0],barStart,beat*4);
+        const barStart=startTime+i*barDur;
+        playPadChord(B[i][0],barStart,barDur*0.98);
+
         const tokens=rhythmTokens(ro[i][1]);
         if(i===5 || i===20){
-            t += beat*4;
+            melodyTime += barDur;
             continue;
         }
         let p=0;
@@ -1123,24 +1129,25 @@ function playWithWebAudio(){
             if(token==="EE"){
                 for(let k=0;k<2;k++){
                     const n=notes[i][p++];
-                    playNote(n.m,t,beat/2); t+=beat/2;
+                    playRhodes(n.m,melodyTime,beat/2); melodyTime+=beat/2;
                 }
             }else if(token==="EEEE"){
                 for(let k=0;k<4;k++){
                     const n=notes[i][p++];
-                    playNote(n.m,t,beat/2); t+=beat/2;
+                    playRhodes(n.m,melodyTime,beat/2); melodyTime+=beat/2;
                 }
             }else{
                 const n=notes[i][p++];
-                const d=durationForToken(token);
-                playNote(n.m,t,d); t+=d;
+                const d=token==="E" ? beat/2 : token==="Q" ? beat : beat*1.5;
+                playRhodes(n.m,melodyTime,d); melodyTime+=d;
             }
         }
     }
 
-    const totalMs=Math.max(0,(t-ctx.currentTime)*1000+100);
+    const totalMs=(B.length*barDur+0.2)*1000;
     audioSynth.timeoutIds.push(setTimeout(()=>{
         if(audioSynth && !audioSynth.stopped){
+            try{ctx.close();}catch(e){}
             audioSynth=null;
             setTransportState("stopped");
         }
@@ -1173,8 +1180,8 @@ async function playPause(){
         audioLoading=true;
         setTransportState("loading");
 
-        // Native Web Audio keeps the generated melody intact and adds a quiet
-        // sustained whole-measure pad behind each harmonic position.
+        // Use the custom Web Audio engine so the generated melody has a Rhodes-like
+        // timbre and the harmony is a sustained whole-note pad.
         playWithWebAudio();
         setTransportState("playing");
     }catch(error){
