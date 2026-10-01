@@ -950,7 +950,7 @@ function renderScore(){
 
                 const leftBar=uniqueBarlines[localBar];
                 const x=92;
-                number.style.left=`${x/svgWidth*100}%`;
+                number.style.left="88px";
                 number.style.top=`${numberTop}px`;
                 system.appendChild(number);
             }
