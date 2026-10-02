@@ -251,7 +251,7 @@ function candidates(n){
 
         let m=12*(o+1)+PC[n];
 
-        if(m>=52 && m<=75){
+        if(m>=52 && m<=84){
             a.push({
                 s:n+o,
                 m:m
