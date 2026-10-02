@@ -826,7 +826,7 @@ function renderScore(){
                 "X:1",
                 "M:4/4",
                 "L:1/8",
-                ...(group===0 ? [`Q:1/4=${getTempo()}`] : []),
+                
                 "K:C",
                 "%%barnumbers 1",
                 `%%measurefirst ${first+1}`,
