@@ -59,3 +59,20 @@ td{padding:10px 12px;border-bottom:1px solid #ddd;white-space:nowrap}
 .fg-style-buttons{display:flex;gap:8px;margin:0 0 14px;}
 .fg-style-buttons button{font:600 13px Arial,Helvetica,sans-serif;padding:9px 15px;border:1px solid #222;background:#fff;color:#111;cursor:pointer;}
 .fg-style-buttons button[aria-pressed="true"]{background:#111;color:#fff;}
+
+/* Jazz lead-sheet typography only. No engraving geometry or application logic changes. */
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap');
+#score .abcjs-chord,
+#score .abcjs-chord text,
+#score text.abcjs-chord {
+  font-family:'Kalam','Comic Sans MS',cursive !important;
+  font-weight:700 !important;
+}
+#score .fg-system-start-number,
+#score .abcjs-bar-number {
+  font-family:'Kalam',Georgia,serif !important;
+  font-style:italic !important;
+}
+#score .abcjs-staff {
+  stroke:#555 !important;
+}
