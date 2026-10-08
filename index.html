@@ -39,6 +39,16 @@
     </div>
   </section>
 
+  <section id="fg-favorites" aria-label="Saved favorite charts">
+    <span id="fg-auth-status">Favorites: not signed in</span>
+    <button id="fg-sign-in" type="button">Sign In</button>
+    <button id="fg-sign-out" type="button" hidden>Sign Out</button>
+    <button id="fg-save" type="button" disabled>♡ Save Favorite</button>
+    <select id="fg-load" aria-label="Load favorite" disabled><option value="">Load Favorite…</option></select>
+    <button id="fg-delete" type="button" disabled>Delete</button>
+    <span id="fg-favorites-message" role="status"></span>
+  </section>
+
   <section id="score-section" aria-label="Generated notation">
     <div id="score"></div>
   </section>
@@ -59,6 +69,9 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.4/dist/abcjs-basic-min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="favorites-config.js"></script>
 <script src="script.js"></script>
+<script src="favorites.js"></script>
 </body>
 </html>

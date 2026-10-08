@@ -76,3 +76,10 @@ td{padding:10px 12px;border-bottom:1px solid #ddd;white-space:nowrap}
 #score .abcjs-staff {
   stroke:#555 !important;
 }
+
+/* Favorites only: independent of the notation and transport layout. */
+#fg-favorites{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:14px 0;padding:10px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd;font:13px Arial,sans-serif}
+#fg-favorites button,#fg-favorites select{padding:8px 10px;border:1px solid #bbb;border-radius:5px;background:white;color:#111;font:inherit}
+#fg-favorites button:not(:disabled){cursor:pointer}
+#fg-favorites button:disabled,#fg-favorites select:disabled{opacity:.45}
+#fg-favorites-message{font-size:12px;color:#555}
