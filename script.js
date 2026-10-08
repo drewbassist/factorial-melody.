@@ -264,6 +264,38 @@ function candidates(n){
     return a;
 }
 
+// Twenty validated placements for the six boundary-tie rhythm patterns.
+// All six occupy a contiguous run within measures 7–20, away from
+// the improvisation measures 6 and 21. Remaining rhythms are shuffled.
+const TIE_TEMPLATES=Array.from({length:20},(_,index)=>{
+    const start=6+(index%9); // zero-based measures 7 through 15
+    const ids=[10,11,12,13,14,15];
+    const shift=Math.floor(index/9);
+    const ordered=ids.slice(shift).concat(ids.slice(0,shift));
+    if(index%2) ordered.reverse();
+    return {start,ids:ordered};
+});
+function shuffleRhythmsWithTies(){
+    const template=pick(TIE_TEMPLATES);
+    const result=Array(24).fill(null);
+    template.ids.forEach((id,j)=>result[template.start+j]=R[id-1]);
+    const other=shuffle(R.filter((_,i)=>i<9 || i>14));
+    let k=0;
+    for(let i=0;i<24;i++) if(!result[i]) result[i]=other[k++];
+    return result;
+}
+// Re-select pentatonics if necessary so each required tied boundary has
+// at least one pitch class common to both sides.
+function ensureTieCompatibleScales(){
+    for(let i=0;i<23;i++){
+        if(!hasBoundaryTie(i) || !hasBoundaryTie(i+1)) continue;
+        const left=new Set(sel[i].split(','));
+        if(sel[i+1].split(',').some(n=>left.has(n))) continue;
+        const options=B[i+1][1].filter(scale=>scale.split(',').some(n=>left.has(n)));
+        if(!options.length) throw Error(`No compatible pentatonic for tie at bar ${i+1}`);
+        sel[i+1]=pick(options);
+    }
+}
 function rhythmTokens(text){
     return text.replace(/~/g, " · ").split("·").map(x=>x.trim()).filter(Boolean);
 }
@@ -414,13 +446,26 @@ function makeNotes(){
             if(j+1<notes[i].length) notes[i][j+1]=notes[i][j];
         }
     }
+    // Apply all required boundary ties after melody generation. Each tied
+    // boundary receives one shared exact MIDI pitch, never an added duration.
     for(let i=0;i<23;i++){
-        if(i===4 || i===5 || i===19 || i===20 || !hasBoundaryTie(i) || !hasBoundaryTie(i+1)) continue;
-        const last=notes[i][notes[i].length-1];
-        if(!sel[i+1].split(",").includes(last.s.replace(/[0-9]/g,""))) continue;
-        // Only use the tie when it respects Smooth Contour's interval limit.
-        if(melodicStyle==="smooth" && notes[i+1].length>1 && Math.abs(notes[i+1][1].m-last.m)>4) continue;
-        notes[i+1][0]=last;
+        if(!hasBoundaryTie(i) || !hasBoundaryTie(i+1)) continue;
+        const shared=sel[i].split(',').filter(n=>sel[i+1].split(',').includes(n));
+        if(!shared.length) throw Error(`Missing shared pitch at bar ${i+1}`);
+        const before=notes[i][notes[i].length-2];
+        const after=notes[i+1][1];
+        const options=shared.flatMap(candidates);
+        const valid=melodicStyle==='smooth'
+            ? options.filter(n=>(!before || Math.abs(n.m-before.m)<=4) && (!after || Math.abs(n.m-after.m)<=4))
+            : options;
+        const pool=valid.length?valid:options;
+        pool.sort((a,b)=>{
+            const cost=n=>(before?Math.abs(n.m-before.m):0)+(after?Math.abs(n.m-after.m):0);
+            return cost(a)-cost(b);
+        });
+        const tied=pool[0];
+        notes[i][notes[i].length-1]=tied;
+        notes[i+1][0]=tied;
     }
 }
 
@@ -468,7 +513,7 @@ function render(){
 function generateAll(){
     if(melodicStyle==="smooth") contourDirections=Array.from({length:3},()=>Math.random()<.5?1:-1);
 
-    ro=shuffle(R);
+    ro=shuffleRhythmsWithTies();
 
     sel=B.map(b=>
         b[1].length
@@ -476,6 +521,7 @@ function generateAll(){
             : null
     );
 
+    ensureTieCompatibleScales();
     makeNotes();
 
     render();
@@ -1895,7 +1941,8 @@ if(rhythmsButton){
 
                 stopPlayback();
 
-                ro=shuffle(R);
+                ro=shuffleRhythmsWithTies();
+                ensureTieCompatibleScales();
 
                 makeNotes();
 
@@ -1930,6 +1977,7 @@ if(pentasButton){
                             : null
                 );
 
+                ensureTieCompatibleScales();
                 makeNotes();
 
                 render();
