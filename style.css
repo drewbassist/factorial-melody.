@@ -54,3 +54,8 @@ td{padding:10px 12px;border-bottom:1px solid #ddd;white-space:nowrap}
 /* Enlarge only notehead glyphs; preserve stem, beam and staff geometry. */
 #score .abcjs-notehead{transform-box:fill-box;transform-origin:center;transform:scale(1.15);}
 
+
+/* Melodic style toggle: no changes to score engraving. */
+.fg-style-buttons{display:flex;gap:8px;margin:0 0 14px;}
+.fg-style-buttons button{font:600 13px Arial,Helvetica,sans-serif;padding:9px 15px;border:1px solid #222;background:#fff;color:#111;cursor:pointer;}
+.fg-style-buttons button[aria-pressed="true"]{background:#111;color:#fff;}

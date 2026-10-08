@@ -220,6 +220,8 @@ B:11
 let ro=[];
 let sel=[];
 let notes=[];
+let melodicStyle="angular";
+let contourDirections=[1,-1,1];
 
 // Playback state.
 let audioSynth=null;
@@ -312,6 +314,49 @@ function melody(
     return out;
 }
 
+// Smooth contour: three independently directed eight-measure phrases.
+// Prefer small intervals, allow brief reversals, and retain pitch-class variety.
+function smoothMelody(scale, previous, rhythmText, barIndex){
+    const names=scale.split(",");
+    const count=attackCount(rhythmText);
+    const pool=names.flatMap(candidates);
+    const direction=contourDirections[Math.floor(barIndex/8)];
+    const midpoint=68 + direction*(barIndex%8-3.5)*1.25;
+    // Dynamic beam search avoids dead ends when consecutive pentatonics differ.
+    let beam=[{seq:[],last:previous,mask:0,score:0}];
+    for(let j=0;j<count;j++){
+        const next=[];
+        for(const state of beam){
+            let allowed=pool.filter(n=>state.last===null || Math.abs(n.m-state.last)<=4);
+            // Across incompatible scales, prefer the smallest possible transition.
+            // A strict third cannot always be satisfied at every scale boundary.
+            if(!allowed.length && j===0){
+                const distance=Math.min(...pool.map(n=>Math.abs(n.m-state.last)));
+                allowed=pool.filter(n=>Math.abs(n.m-state.last)===distance);
+            }
+            for(const n of allowed){
+                const bit=1<<names.indexOf(n.s.replace(/[0-9]/g,""));
+                const leap=state.last===null?0:n.m-state.last;
+                const reversal=leap*direction<0;
+                const target=midpoint + direction*(j/Math.max(1,count-1))*1.5;
+                const novelty=(state.mask&bit)?0:2.7;
+                const score=state.score + novelty + direction*leap*.48
+                    - Math.abs(n.m-target)*.11 - Math.abs(leap)*.13
+                    - (reversal? .65:0) + Math.random()*.55;
+                next.push({seq:[...state.seq,n],last:n.m,mask:state.mask|bit,score});
+            }
+        }
+        if(!next.length) throw Error("No smooth contour candidates");
+        next.sort((a,b)=>b.score-a.score);
+        beam=next.slice(0,100);
+    }
+    beam.sort((a,b)=>{
+        const coverage=x=>names.reduce((n,_,i)=>n+((x.mask>>i)&1),0);
+        return (coverage(b)*5+b.score)-(coverage(a)*5+a.score);
+    });
+    return beam[0].seq;
+}
+
 function makeNotes(){
 
     notes=[];
@@ -331,7 +376,9 @@ function makeNotes(){
 
         }else{
 
-            let n=melody(sel[i],prev,ro[i][1]);
+            let n=melodicStyle==="angular"
+                ? melody(sel[i],prev,ro[i][1])
+                : smoothMelody(sel[i],prev,ro[i][1],i);
 
             notes.push(n);
 
@@ -382,6 +429,7 @@ function render(){
 }
 
 function generateAll(){
+    if(melodicStyle==="smooth") contourDirections=Array.from({length:3},()=>Math.random()<.5?1:-1);
 
     ro=shuffle(R);
 
@@ -1749,6 +1797,31 @@ if(tempoControl){
 /* ============================================================
    GENERATOR CONTROLS
    ============================================================ */
+
+// Two style buttons only; Angular remains the unchanged default generator.
+const styleButtons=document.createElement("div");
+styleButtons.className="fg-style-buttons";
+styleButtons.setAttribute("role","group");
+styleButtons.setAttribute("aria-label","Melodic Style");
+for(const [value,label] of [["angular","Angular"],["smooth","Smooth Contour"]]){
+    const button=document.createElement("button");
+    button.type="button";
+    button.textContent=label;
+    button.dataset.style=value;
+    button.setAttribute("aria-pressed",String(value===melodicStyle));
+    button.addEventListener("click",()=>{
+        if(melodicStyle===value) return;
+        melodicStyle=value;
+        if(value==="smooth") contourDirections=Array.from({length:3},()=>Math.random()<.5?1:-1);
+        styleButtons.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.style===value)));
+        stopPlayback();
+        makeNotes();
+        render();
+    });
+    styleButtons.appendChild(button);
+}
+const scoreSection=document.querySelector("#score-section");
+if(scoreSection) scoreSection.parentNode.insertBefore(styleButtons,scoreSection);
 
 const generateButton=
     document.querySelector("#generate");
