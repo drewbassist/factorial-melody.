@@ -20,8 +20,8 @@ const R=[
 ["Rhythm 19","EEEE · Q · Q"],
 ["Rhythm 20","E · Q. · EEEE"],
 ["Rhythm 21","EEEE · E · Q."],
-["Rhythm 22","EEEE~E · EE · Q"],
-["Rhythm 23","EEEE · E~Q · EE"],
+["Rhythm 22","EEEE~E · E · Q"],
+["Rhythm 23","EEEE · E~Q · E"],
 ["Rhythm 24","EEEE · E~Q · E"]
 ];
 
