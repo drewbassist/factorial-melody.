@@ -1,28 +1,28 @@
 const R=[
 ["Rhythm 1","Q · EE · EE · Q"],
 ["Rhythm 2","Q · EE · E · Q · E"],
-["Rhythm 3","Q · EE · E · E · E · E"],
+["Rhythm 3","Q · EE~E · E · E · E"],
 ["Rhythm 4","EE · Q · E · Q · E"],
-["Rhythm 5","EE · Q · E · E · E · E"],
+["Rhythm 5","EE · Q~E · E · E · E"],
 ["Rhythm 6","EE · Q · Q · EE"],
-["Rhythm 7","E · Q · E · E · E · E · E"],
+["Rhythm 7","E · Q · E~E · E · E · E"],
 ["Rhythm 8","E · Q · E · Q · EE"],
 ["Rhythm 9","E · Q · E · EE · Q"],
-["Rhythm 10","EEEE · Q · EE"],
-["Rhythm 11","EEEE · EE · Q"],
-["Rhythm 12","EEEE · E · Q · E"],
-["Rhythm 13","E · Q · E · EEEE"],
-["Rhythm 14","Q · EE · EEEE"],
-["Rhythm 15","EE · Q · EEEE"],
+["Rhythm 10","~EEEE · Q · EE~"],
+["Rhythm 11","~EEEE · EE · Q~"],
+["Rhythm 12","~EEEE · E · Q · E~"],
+["Rhythm 13","~E · Q · E · EEEE~"],
+["Rhythm 14","~Q · EE · EEEE~"],
+["Rhythm 15","~EE · Q · EEEE~"],
 ["Rhythm 16","Q · Q · EEEE"],
 ["Rhythm 17","EEEE · Q. · E"],
 ["Rhythm 18","Q. · E · EEEE"],
 ["Rhythm 19","EEEE · Q · Q"],
 ["Rhythm 20","E · Q. · EEEE"],
 ["Rhythm 21","EEEE · E · Q."],
-["Rhythm 22","EE · E · E · EE · Q"],
-["Rhythm 23","EE · E · Q · EE · E"],
-["Rhythm 24","EEEE · E · Q · E"]
+["Rhythm 22","EEEE~E · EE · Q"],
+["Rhythm 23","EEEE · E~Q · EE"],
+["Rhythm 24","EEEE · E~Q · E"]
 ];
 
 const B=[
@@ -265,7 +265,7 @@ function candidates(n){
 }
 
 function rhythmTokens(text){
-    return text.split("·").map(x=>x.trim()).filter(Boolean);
+    return text.replace(/~/g, "").split("·").map(x=>x.trim()).filter(Boolean);
 }
 
 function attackCount(rhythmText){
@@ -277,6 +277,29 @@ function attackCount(rhythmText){
     },0);
 }
 
+// Original rhythm tie specification. Internal ties join adjacent noteheads;
+// boundary ties require both adjacent rhythms to carry boundary markers.
+const INTERNAL_TIES={3:[2],5:[2],7:[2],22:[3],23:[4],24:[4]};
+function rhythmNumber(i){return Number(ro[i][0].match(/\d+/)[0]);}
+function hasBoundaryTie(i){return i>=0 && i<24 && rhythmNumber(i)>=10 && rhythmNumber(i)<=15;}
+function internalTiePositions(i){return INTERNAL_TIES[rhythmNumber(i)] || [];}
+function boundaryTied(i){
+    return i>=0 && i<23 && i!==4 && i!==5 && i!==19 && i!==20 &&
+        hasBoundaryTie(i) && hasBoundaryTie(i+1) &&
+        notes[i] && notes[i+1] &&
+        notes[i][notes[i].length-1].m===notes[i+1][0].m;
+}
+function eventDurations(i){
+    const durations=[];
+    for(const token of rhythmTokens(ro[i][1])){
+        if(token==="E") durations.push(1);
+        else if(token==="EE") durations.push(1,1);
+        else if(token==="EEEE") durations.push(1,1,1,1);
+        else if(token==="Q") durations.push(2);
+        else if(token==="Q.") durations.push(3);
+    }
+    return durations;
+}
 function melody(
     scale,
     previous=null,
@@ -385,6 +408,20 @@ function makeNotes(){
             prev=n[n.length-1].m;
         }
     });
+    for(let i=0;i<24;i++){
+        if(!notes[i]) continue;
+        for(const j of internalTiePositions(i)){
+            if(j+1<notes[i].length) notes[i][j+1]=notes[i][j];
+        }
+    }
+    for(let i=0;i<23;i++){
+        if(i===4 || i===5 || i===19 || i===20 || !hasBoundaryTie(i) || !hasBoundaryTie(i+1)) continue;
+        const last=notes[i][notes[i].length-1];
+        if(!sel[i+1].split(",").includes(last.s.replace(/[0-9]/g,""))) continue;
+        // Only use the tie when it respects Smooth Contour's interval limit.
+        if(melodicStyle==="smooth" && notes[i+1].length>1 && Math.abs(notes[i+1][1].m-last.m)>4) continue;
+        notes[i+1][0]=last;
+    }
 }
 
 function render(){
@@ -688,6 +725,7 @@ function abcMeasure(index){
         }
 
         out += event.abc;
+        if(internalTiePositions(index).includes(i) || (i===events.length-1 && boundaryTied(index))) out += "-";
     });
 
     return out;
@@ -1326,47 +1364,37 @@ async function playWithSoundFonts(){
         chordNotes.forEach(midi=>playSample(accompanimentInstrument,midi,start,dur,0.105,accompanimentMaster));
     };
 
-    let melodyTime=startTime;
+    // Schedule sustained notes as one attack, including cross-barline ties.
+    const melodyEvents=[];
     for(let i=0;i<B.length;i++){
         const barStart=startTime+i*barDur;
-
         if(i===20){
-            // Measure 21: Dm7 on beats 1-2, Db7 on beats 3-4.
             const halfBar=barDur/2;
-            const playFixedChord=(voicing,start,dur)=>{
-                voicing.forEach(midi=>
-                    playSample(accompanimentInstrument,midi,start,dur,0.105,accompanimentMaster)
-                );
-            };
-            playFixedChord([53,57,60,62],barStart,halfBar);
-            playFixedChord([53,56,59,61],barStart+halfBar,halfBar);
+            [53,57,60,62].forEach(m=>playSample(accompanimentInstrument,m,barStart,halfBar,0.105,accompanimentMaster));
+            [53,56,59,61].forEach(m=>playSample(accompanimentInstrument,m,barStart+halfBar,halfBar,0.105,accompanimentMaster));
         }else{
             playAccompanimentChord(B[i][0],barStart,barDur);
         }
-
-        const tokens=rhythmTokens(ro[i][1]);
-        if(i===5 || i===20){
-            melodyTime += barDur;
-            continue;
+        if(i===5 || i===20) continue;
+        let pos=0;
+        eventDurations(i).forEach((units,j)=>{
+            melodyEvents.push({m:notes[i][j].m,start:barStart+pos*beat/2,dur:units*beat/2,
+                tieNext:internalTiePositions(i).includes(j) || (j===notes[i].length-1 && boundaryTied(i))});
+            pos+=units;
+        });
+    }
+    for(let j=0;j<melodyEvents.length;j++){
+        const ev=melodyEvents[j];
+        if(ev.consumed) continue;
+        let k=j;
+        while(melodyEvents[k].tieNext && k+1<melodyEvents.length &&
+              melodyEvents[k+1].m===ev.m &&
+              Math.abs(melodyEvents[k].start+melodyEvents[k].dur-melodyEvents[k+1].start)<.0001){
+            k++;
+            ev.dur+=melodyEvents[k].dur;
+            melodyEvents[k].consumed=true;
         }
-        let p=0;
-        for(const token of tokens){
-            if(token==="EE"){
-                for(let k=0;k<2;k++){
-                    const n=notes[i][p++];
-                    playMelodyVoice(n.m,melodyTime,beat/2); melodyTime+=beat/2;
-                }
-            }else if(token==="EEEE"){
-                for(let k=0;k<4;k++){
-                    const n=notes[i][p++];
-                    playMelodyVoice(n.m,melodyTime,beat/2); melodyTime+=beat/2;
-                }
-            }else{
-                const n=notes[i][p++];
-                const d=token==="E" ? beat/2 : token==="Q" ? beat : beat*1.5;
-                playMelodyVoice(n.m,melodyTime,d); melodyTime+=d;
-            }
-        }
+        playMelodyVoice(ev.m,ev.start,ev.dur);
     }
 
     const totalMs=(B.length*barDur+0.2)*1000;
