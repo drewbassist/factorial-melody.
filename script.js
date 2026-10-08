@@ -924,8 +924,8 @@ function renderScore(){
         // effectively disappear.
         const staffWidth=
             Math.max(
-                600,
-                Math.round(browserWidth - 80)
+                520,
+                Math.round(browserWidth * 0.8 - 72)
             );
 
 
@@ -943,8 +943,8 @@ function renderScore(){
                 `${first+1}-${last}`;
 
             system.style.display="block";
-            system.style.width="100%";
-            system.style.maxWidth="100%";
+            system.style.width="80%";
+            system.style.maxWidth="80%";
             system.style.minWidth="0";
             system.style.clear="both";
             system.style.margin="0 0 18px 0";
@@ -1009,7 +1009,7 @@ function renderScore(){
                 abc.join("\n"),
                 {
                     staffwidth:staffWidth,
-                    scale:0.8,
+                    scale:1.0,
                     add_classes:true,
                     oneSvgPerLine:false,
                     paddingtop:
@@ -1028,7 +1028,7 @@ function renderScore(){
             system.querySelectorAll("svg").forEach(svg=>{
 
                 svg.style.display="block";
-                svg.style.width="100%";
+                svg.style.width="auto";
                 svg.style.height="auto";
                 svg.style.maxWidth="100%";
                 svg.style.minWidth="0";
