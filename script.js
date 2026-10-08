@@ -768,24 +768,46 @@ function abcMeasure(index){
         );
     }
 
-    let out="";
+    // Engraving only: consolidate internal eighth+quarter ties into a
+    // dotted quarter, but never across the midpoint of the 4/4 bar.
+    // Keep the original event indices for all remaining tie positions.
+    const tiePositions=internalTiePositions(index);
+    const engraved=[];
+    for(let i=0;i<events.length;i++){
+        const first=events[i];
+        const second=events[i+1];
+        const canDot=second && tiePositions.includes(i) &&
+            first.duration+second.duration===3 &&
+            ((first.duration===1 && second.duration===2) ||
+             (first.duration===2 && second.duration===1)) &&
+            Math.floor(first.start/4)===Math.floor((second.start+second.duration-1)/4);
+        if(canDot){
+            engraved.push({
+                abc:first.abc.replace(/\d+$/, "3"),
+                duration:3,
+                start:first.start,
+                originalEnd:i+1
+            });
+            i++;
+        }else{
+            engraved.push({...first, originalEnd:i});
+        }
+    }
 
-    events.forEach((event,i)=>{
+    let out="";
+    engraved.forEach((event,i)=>{
         if(i>0){
-            const prev=events[i-1];
+            const prev=engraved[i-1];
             const beamTogether=
                 prev.duration===1 &&
                 event.duration===1 &&
                 prev.start+1===event.start &&
                 Math.floor(prev.start/2)===Math.floor(event.start/2);
-
-            // No space = beam the two eighth notes in ABC.
-            // Space = start a new rhythmic/beam group.
             out += beamTogether ? "" : " ";
         }
-
         out += event.abc;
-        if(internalTiePositions(index).includes(i) || (i===events.length-1 && boundaryTied(index))) out += "-";
+        if(tiePositions.includes(event.originalEnd) ||
+           (event.originalEnd===events.length-1 && boundaryTied(index))) out += "-";
     });
 
     return out;
