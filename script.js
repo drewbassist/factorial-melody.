@@ -717,11 +717,25 @@ function abcMeasure(index){
     let p=0;
     let eighthPos=0;
     const events=[];
+    // Accidentals persist for the same letter and octave within this bar.
+    const barAccidentals=new Map();
 
     const addEvent=(duration)=>{
         const note=pitches[p++];
+        const match=note.s.match(/^([A-G])([#b]?)(\d)$/);
+        if(!match) throw Error("Invalid pitch: "+note.s);
+        const key=match[1]+match[3];
+        const desired=match[2] || "";
+        const current=barAccidentals.get(key) || "";
+        let pitch=abcPitch(note);
+        if(desired===current){
+            pitch=pitch.replace(/^[\^_=]/,"");
+        }else if(desired===""){
+            pitch="="+pitch;
+        }
+        barAccidentals.set(key,desired);
         events.push({
-            abc: abcPitch(note) + String(duration),
+            abc: pitch + String(duration),
             duration: duration,
             start: eighthPos
         });
