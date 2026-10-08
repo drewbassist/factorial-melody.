@@ -50,7 +50,7 @@ td{padding:10px 12px;border-bottom:1px solid #ddd;white-space:nowrap}
 .score-system{display:block;width:100%;min-height:120px;overflow:hidden;clear:both;}
 .score-system svg{max-width:none;}
 .score-system + .score-system{margin-top:10px;}
-.score-system svg{display:block;width:auto !important;height:auto !important;margin:0;}
+.score-system svg{display:block;width:100% !important;height:auto !important;margin:0;}
 /* Enlarge only notehead glyphs; preserve stem, beam and staff geometry. */
 #score .abcjs-notehead{transform-box:fill-box;transform-origin:center;transform:scale(1.15);}
 

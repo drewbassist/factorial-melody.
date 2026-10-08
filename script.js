@@ -924,8 +924,8 @@ function renderScore(){
         // effectively disappear.
         const staffWidth=
             Math.max(
-                760,
-                Math.round((browserWidth - 48) * 0.8)
+                600,
+                Math.round(browserWidth - 80)
             );
 
 
@@ -1028,7 +1028,7 @@ function renderScore(){
             system.querySelectorAll("svg").forEach(svg=>{
 
                 svg.style.display="block";
-                svg.style.width="auto";
+                svg.style.width="100%";
                 svg.style.height="auto";
                 svg.style.maxWidth="100%";
                 svg.style.minWidth="0";
