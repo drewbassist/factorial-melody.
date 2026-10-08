@@ -1080,11 +1080,27 @@ function renderScore(){
                 number.className="fg-uniform-bar-number";
                 number.textContent=String(first+localBar+1);
 
-                const leftBar=uniqueBarlines[localBar];
-                const x=92;
-                number.style.left="48px";
-                number.style.top=`${numberTop}px`;
-                system.appendChild(number);
+                // SVG coordinates are independent of CSS scaling and container padding.
+                // Anchor directly beneath the time signature instead of the system edge.
+                const timeSig=svg.querySelector(".abcjs-time-signature");
+                let anchorX=70;
+                if(timeSig){
+                    try{const b=timeSig.getBBox();anchorX=b.x+b.width/2;}catch(e){}
+                }else{
+                    const clef=svg.querySelector(".abcjs-clef");
+                    if(clef){try{const b=clef.getBBox();anchorX=b.x+b.width+15;}catch(e){}}
+                }
+                const svgNumber=document.createElementNS("http://www.w3.org/2000/svg","text");
+                svgNumber.setAttribute("x",String(anchorX));
+                svgNumber.setAttribute("y",String(numberTop+12));
+                svgNumber.setAttribute("text-anchor","middle");
+                svgNumber.setAttribute("font-family",'Georgia, "Times New Roman", serif');
+                svgNumber.setAttribute("font-style","italic");
+                svgNumber.setAttribute("font-size","13");
+                svgNumber.setAttribute("fill","#171717");
+                svgNumber.setAttribute("class","fg-system-start-number");
+                svgNumber.textContent=number.textContent;
+                svg.appendChild(svgNumber);
             }
 
 
