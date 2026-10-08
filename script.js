@@ -122,10 +122,10 @@ const B=[
 ]],
 
 ["GM7",[
-"G,A,Bb,D,E",
-"Bb,C,D,F,G",
-"C,D,E,G,A",
-"F,G,A,C,D"
+"G,A,B,D,E",
+"A,B,C#,E,F#",
+"D,E,F#,A,B",
+"E,F#,G,B,C#"
 ]],
 
 ["Cm7",[
