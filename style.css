@@ -23,7 +23,7 @@ h1{font-size:58px;line-height:1;margin:0 0 18px;font-weight:700;letter-spacing:-
 #tempo-control{display:flex;align-items:center;gap:9px;margin-top:12px;font:15px Arial,Helvetica,sans-serif;color:#555}
 #tempo-control label{color:#111;font-weight:700}
 #tempo{width:72px;height:36px;border:1px solid #bbb;background:#fff;padding:5px 8px;font-size:16px}
-#score-section{background:#fff;padding:18px 20px 24px;overflow-x:auto;overflow-y:hidden;margin:0 0 20px}
+#score-section{background:#fff;padding:8px 12px 10px;overflow-x:auto;overflow-y:hidden;margin:0 0 20px}
 #score{width:100%}
 #score svg{display:block;width:auto;height:auto;margin:0 auto}
 #score .abcjs-note{fill:#111}
@@ -47,9 +47,9 @@ td{padding:10px 12px;border-bottom:1px solid #ddd;white-space:nowrap}
 
 /* Six explicit four-measure systems: 1–4, 5–8, 9–12, 13–16, 17–20, 21–24. */
 .score-systems{display:block;width:100%;}
-.score-system{display:block;width:80%;min-height:120px;overflow:hidden;clear:both;}
+.score-system{display:block;width:80%;min-height:0;overflow:hidden;clear:both;}
 .score-system svg{max-width:none;}
-.score-system + .score-system{margin-top:10px;}
+.score-system + .score-system{margin-top:0;}
 .score-system svg{display:block;width:auto !important;height:auto !important;margin:0;}
 /* Enlarge only notehead glyphs; preserve stem, beam and staff geometry. */
 #score .abcjs-notehead{transform-box:fill-box;transform-origin:center;transform:scale(1.15);}

@@ -947,7 +947,7 @@ function renderScore(){
             system.style.maxWidth="80%";
             system.style.minWidth="0";
             system.style.clear="both";
-            system.style.margin="0 0 18px 0";
+            system.style.margin="0 0 2px 0";
             system.style.overflow="hidden";
             system.style.position="relative";
 
@@ -1013,8 +1013,8 @@ function renderScore(){
                     add_classes:true,
                     oneSvgPerLine:false,
                     paddingtop:
-                        group===0 ? 8 : 2,
-                    paddingbottom:14,
+                        group===0 ? 6 : 2,
+                    paddingbottom:6,
                     paddingleft:24,
                     paddingright:24
                 }
