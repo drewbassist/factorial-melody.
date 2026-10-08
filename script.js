@@ -265,7 +265,7 @@ function candidates(n){
 }
 
 function rhythmTokens(text){
-    return text.replace(/~/g, "").split("·").map(x=>x.trim()).filter(Boolean);
+    return text.replace(/~/g, " · ").split("·").map(x=>x.trim()).filter(Boolean);
 }
 
 function attackCount(rhythmText){
