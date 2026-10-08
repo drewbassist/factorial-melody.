@@ -947,7 +947,7 @@ function renderScore(){
             system.style.maxWidth="80%";
             system.style.minWidth="0";
             system.style.clear="both";
-            system.style.margin="0 0 2px 0";
+            system.style.margin="0 auto 2px auto";
             system.style.overflow="hidden";
             system.style.position="relative";
 
