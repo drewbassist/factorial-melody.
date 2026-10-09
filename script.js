@@ -33,7 +33,7 @@ const B=[
 "F,G,Ab,C,D"
 ]],
 
-["AbmM7",[
+["AbM7",[
 "Ab,Bb,C,Eb,F",
 "Eb,F,G,Bb,C",
 "Bb,C,D,F,G",
