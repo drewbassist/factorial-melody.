@@ -841,7 +841,8 @@ function buildABC(){
 
         const chord=B[i][0]
             .replace(/♭/g,"b")
-            .replace(/♯/g,"#");
+            .replace(/♯/g,"#")
+            .replace(/M7/g,"△7");
 
         let bar;
 
@@ -1010,7 +1011,8 @@ function renderScore(){
 
                 const chord=B[i][0]
                     .replace(/♭/g,"b")
-                    .replace(/♯/g,"#");
+                    .replace(/♯/g,"#")
+            .replace(/M7/g,"△7");
 
 
                 let bar;
@@ -1056,6 +1058,24 @@ function renderScore(){
                 }
             );
 
+
+            // Display-only: make the major-seventh triangle a small raised glyph.
+            // The underlying chord data, ABC, and playback remain unchanged.
+            system.querySelectorAll("svg text").forEach(label => {
+                const value = label.textContent;
+                if (!value || !value.includes("△7")) return;
+                const parts = value.split("△");
+                if (parts.length !== 2) return;
+                const ns = "http://www.w3.org/2000/svg";
+                label.textContent = "";
+                label.appendChild(document.createTextNode(parts[0]));
+                const triangle = document.createElementNS(ns, "tspan");
+                triangle.textContent = "△";
+                triangle.setAttribute("font-size", "65%");
+                triangle.setAttribute("baseline-shift", "super");
+                label.appendChild(triangle);
+                label.appendChild(document.createTextNode(parts[1]));
+            });
 
             /*
              * Force the generated SVG to stay inside its own
